@@ -94,12 +94,12 @@ public class RegistrarActivity extends AppCompatActivity {
                                                 boolean isFacebook = signInMethods != null && signInMethods.contains(FacebookAuthProvider.FACEBOOK_SIGN_IN_METHOD);
 
                                                 if (isGoogle || isFacebook) {
-                                                    Toast.makeText(RegistrarActivity.this, "Ese correo ya está registrado con otro tipo de inicio de sesión. Por favor, intenta iniciar sesión.", Toast.LENGTH_LONG).show();
+                                                    Toast.makeText(RegistrarActivity.this, "ESE CORREO YA ESTA REGISTRADO", Toast.LENGTH_LONG).show();
                                                 } else {
-                                                    Toast.makeText(RegistrarActivity.this, "Ese correo ya está registrado. Intenta iniciar sesión.", Toast.LENGTH_LONG).show();
+                                                    Toast.makeText(RegistrarActivity.this, "ESE CORREO YA ESTA REGISTRADO", Toast.LENGTH_LONG).show();
                                                 }
                                             } else {
-                                                Toast.makeText(RegistrarActivity.this, "Error al verificar el correo.", Toast.LENGTH_SHORT).show();
+                                                Toast.makeText(RegistrarActivity.this, "ERROR AL VERIFICAR EL CORREO", Toast.LENGTH_SHORT).show();
                                             }
                                         });
                             } else {
