@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E66BD7"
+    tools:context=".LoginActivity">
+
+    <Button
+        android:id="@+id/buttonIniciarSesion"
+        android:layout_width="171dp"
+        android:layout_height="44dp"
+        android:backgroundTint="#00FFFFFF"
+        android:text="INICIAR SESIÓN"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.497"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.669"
+        app:strokeColor="#FDFDFD"
+        app:strokeWidth="3dp"
+        tools:ignore="TouchTargetSizeCheck" />
+
+    <ImageView
+        android:id="@+id/imageView2"
+        android:layout_width="229dp"
+        android:layout_height="177dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.101"
+        app:srcCompat="@drawable/logo" />
+
+    <EditText
+        android:id="@+id/editTextCorreo"
+        android:layout_width="222dp"
+        android:layout_height="59dp"
+        android:background="@drawable/edit_text_border"
+        android:ems="10"
+        android:hint="Correo"
+        android:inputType="text"
+        android:textAlignment="center"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#FFFFFF"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.497"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.421"
+        tools:ignore="TouchTargetSizeCheck,TouchTargetSizeCheck" />
+
+    <EditText
+        android:id="@+id/editTextPass"
+        android:layout_width="222dp"
+        android:layout_height="59dp"
+        android:background="@drawable/edit_text_border"
+        android:ems="10"
+        android:hint="Contraseña"
+        android:inputType="text"
+        android:textAlignment="center"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#FFFFFF"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.497"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.566"
+        tools:ignore="TouchTargetSizeCheck,TouchTargetSizeCheck" />
+
+    <TextView
+        android:id="@+id/textViewRegistrar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/adlam_display"
+        android:text="¿No tienes cuenta? Registrate aquí"
+        android:textColor="#FBFBFB"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.733" />
+
+    <com.google.android.gms.common.SignInButton
+        android:id="@+id/buttonGoogle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sign in with Google"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.865"
+        tools:ignore="MissingConstraints">
+
+
+    </com.google.android.gms.common.SignInButton>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

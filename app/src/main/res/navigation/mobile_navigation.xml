@@ -3,23 +3,41 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/nav_home">
+    app:startDestination="@+id/nav_topCanciones">
 
     <fragment
-        android:id="@+id/nav_home"
+        android:id="@+id/nav_topCanciones"
         android:name="es.riberadeltajo.topify.ui.home.HomeFragment"
         android:label="@string/menu_home"
         tools:layout="@layout/fragment_home" />
 
     <fragment
-        android:id="@+id/nav_gallery"
-        android:name="es.riberadeltajo.topify.ui.gallery.GalleryFragment"
-        android:label="@string/menu_gallery"
-        tools:layout="@layout/fragment_gallery" />
+        android:id="@+id/nav_buscarCanciones"
+        android:name="es.riberadeltajo.topify.ui.slideshow.BuscarFragment"
+        android:label="@string/menu_buscar"
+        tools:layout="@layout/fragment_listas" />
 
     <fragment
-        android:id="@+id/nav_slideshow"
-        android:name="es.riberadeltajo.topify.ui.slideshow.SlideshowFragment"
-        android:label="@string/menu_slideshow"
-        tools:layout="@layout/fragment_slideshow" />
+        android:id="@+id/nav_listasReproduccion"
+        android:name="es.riberadeltajo.topify.ui.slideshow.ListasFragment"
+        android:label="@string/menu_listas"
+        tools:layout="@layout/fragment_slideshow" >
+        <action
+            android:id="@+id/action_nav_slideshow_to_listaDetalleFragment"
+            app:destination="@id/listaDetalleFragment">
+            <argument
+                android:name="nombreLista"
+                app:argType="string" />
+        </action>
+    </fragment>
+
+    <fragment
+        android:id="@+id/listaDetalleFragment"
+        android:name="es.riberadeltajo.topify.ui.slideshow.ListaDetalleFragment"
+        android:label="Detalles de la lista"
+        tools:layout="@layout/fragment_lista_detalle">
+        <argument
+            android:name="nombreLista"
+            app:argType="string" />
+    </fragment>
 </navigation>
