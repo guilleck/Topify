@@ -1,5 +1,6 @@
 package es.riberadeltajo.topify.ui.slideshow;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,19 +14,22 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
 
 import es.riberadeltajo.topify.R;
+import es.riberadeltajo.topify.SongDetailActivity;
 import es.riberadeltajo.topify.adapter.CancionListaAdapter;
+import es.riberadeltajo.topify.models.DeezerTrackResponse;
 import es.riberadeltajo.topify.models.ListaReproduccionViewModel;
-
 
 public class ListaDetalleFragment extends Fragment {
 
     private TextView textViewNombreListaDetalle;
     private RecyclerView recyclerViewCancionesLista;
-    private CancionListaAdapter adapter;
     private ListaReproduccionViewModel viewModel;
     private String nombreLista;
+    private CancionListaAdapter adapter;
+    private DeezerTrackResponse.Track cancionSeleccionada;
 
     public static ListaDetalleFragment newInstance(String nombreLista) {
         ListaDetalleFragment fragment = new ListaDetalleFragment();
@@ -52,6 +56,7 @@ public class ListaDetalleFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
         textViewNombreListaDetalle = view.findViewById(R.id.textViewNombreListaDetalle);
         recyclerViewCancionesLista = view.findViewById(R.id.recyclerViewCancionesLista);
         recyclerViewCancionesLista.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -60,10 +65,32 @@ public class ListaDetalleFragment extends Fragment {
 
         viewModel = new ViewModelProvider(requireActivity()).get(ListaReproduccionViewModel.class);
 
-        viewModel.getCancionesDeLista(nombreLista).observe(getViewLifecycleOwner(), canciones -> {
-            adapter = new CancionListaAdapter(canciones); // Asegúrate de que tienes un Adapter para las canciones
-            recyclerViewCancionesLista.setAdapter(adapter);
-            adapter.notifyDataSetChanged(); // Notifica al Adapter que los datos han cambiado
+        adapter = new CancionListaAdapter(requireContext(), new ArrayList<>(), cancion -> {
+            cancionSeleccionada = cancion;
+            viewModel.obtenerDetallesCancion(cancion.deezer_id, requireContext());
         });
+
+        recyclerViewCancionesLista.setAdapter(adapter);
+
+        viewModel.getCancionesDeLista(nombreLista).observe(getViewLifecycleOwner(), canciones -> {
+            adapter.setCanciones(canciones);
+        });
+
+        viewModel.getDetallesCancionCargados().observe(getViewLifecycleOwner(), trackDetails -> {
+            if (trackDetails != null && cancionSeleccionada != null && trackDetails.deezer_id == cancionSeleccionada.deezer_id) {
+                Intent intent = new Intent(requireContext(), SongDetailActivity.class);
+                intent.putExtra("title", trackDetails.title);
+                intent.putExtra("artist", trackDetails.artist != null ? trackDetails.artist.name : "Desconocido");
+                intent.putExtra("coverUrl", (trackDetails.album != null) ? trackDetails.album.cover_big : "");
+                intent.putExtra("duration", trackDetails.duration);
+                intent.putExtra("previewUrl", trackDetails.preview);
+                startActivity(intent);
+                // Resetea el LiveData para evitar múltiples inicios si la misma canción se selecciona de nuevo rápidamente
+                viewModel.resetDetallesCancionCargados();
+                cancionSeleccionada = null;
+            }
+        });
+
     }
+
 }

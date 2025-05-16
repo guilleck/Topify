@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -66,31 +67,38 @@ public class SongDetailActivity extends AppCompatActivity {
 
     private void playPreview(String previewUrl) {
         if (previewUrl != null && !previewUrl.isEmpty()) {
+            Log.d("SongDetailActivity", "Attempting to play preview: " + previewUrl);
             if (!isPlaying) {
                 mediaPlayer = new MediaPlayer();
                 mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
                 try {
+                    Log.d("SongDetailActivity", "Setting data source: " + previewUrl);
                     mediaPlayer.setDataSource(previewUrl);
                     mediaPlayer.prepareAsync();
                     mediaPlayer.setOnPreparedListener(mp -> {
+                        Log.d("SongDetailActivity", "MediaPlayer prepared. Starting playback.");
                         mp.start();
                         isPlaying = true;
                         buttonPlayPreview.setText("Parar");
                     });
                     mediaPlayer.setOnCompletionListener(mp -> {
+                        Log.d("SongDetailActivity", "MediaPlayer completed playback.");
                         stopPreview();
                     });
                     mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                        Log.e("SongDetailActivity", "MediaPlayer error: what=" + what + ", extra=" + extra);
                         Toast.makeText(this, "Error playing preview", Toast.LENGTH_SHORT).show();
                         stopPreview();
                         return true;
                     });
                 } catch (IOException e) {
+                    Log.e("SongDetailActivity", "IOException setting data source: " + e.getMessage());
                     e.printStackTrace();
                     Toast.makeText(this, "Error loading preview", Toast.LENGTH_SHORT).show();
                     stopPreview();
                 }
             } else {
+                Log.d("SongDetailActivity", "Stopping preview.");
                 stopPreview();
             }
         } else {
@@ -100,11 +108,14 @@ public class SongDetailActivity extends AppCompatActivity {
 
     private void stopPreview() {
         if (mediaPlayer != null) {
+            Log.d("SongDetailActivity", "Stopping and releasing MediaPlayer.");
             mediaPlayer.stop();
             mediaPlayer.release();
             mediaPlayer = null;
             isPlaying = false;
             buttonPlayPreview.setText("Escuchar");
+        } else {
+            Log.d("SongDetailActivity", "MediaPlayer is null, nothing to stop.");
         }
     }
 

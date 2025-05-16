@@ -11,5 +11,12 @@
     <string name="menu_listas">Listas de Reproducción</string>
     <string name="menu_buscar">Buscar</string>
     <string name="client_id">105733984197-g19ggkq0favrid0lqft3jmclfggo1mni.apps.googleusercontent.com</string>
+    <string-array name="search_types">
+        <item>Todo</item>
+        <item>Canción</item>
+        <item>Artista</item>
+        <item>Álbum</item>
+    </string-array>
+
 
 </resources>
