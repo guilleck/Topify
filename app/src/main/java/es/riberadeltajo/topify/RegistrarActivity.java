@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 
 import es.riberadeltajo.topify.database.DatabaseHelper;
+import es.riberadeltajo.topify.database.FirestoreHelper;
 
 public class RegistrarActivity extends AppCompatActivity {
     private FirebaseAuth auth;
@@ -75,8 +76,9 @@ public class RegistrarActivity extends AppCompatActivity {
                         if (usuario != null) {
                             String uid = usuario.getUid();
                             String emailUser = usuario.getEmail();
+                            String foto = "";
 
-                            registrarUsuarioEnBaseDatos(uid, nombre, emailUser);
+                            FirestoreHelper.guardarUsuarioFirestore(uid,nombre,emailUser,foto);
 
                             navegarLoginActivity();
                         }
@@ -112,17 +114,7 @@ public class RegistrarActivity extends AppCompatActivity {
                 });
     }
 
-    private void registrarUsuarioEnBaseDatos(String userId, String name, String email) {
-        String fechaLogin = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
 
-        DatabaseHelper dbHelper = new DatabaseHelper(this);
-
-        dbHelper.insertOrUpdateUser(
-                userId,
-                name,
-                email
-        );
-    }
 
     private void navegarLoginActivity() {
         Intent intent = new Intent(RegistrarActivity.this, LoginActivity.class);

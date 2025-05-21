@@ -2,7 +2,10 @@ package es.riberadeltajo.topify;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -31,10 +34,19 @@ import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
+
+import es.riberadeltajo.topify.database.FirestoreHelper;
+import es.riberadeltajo.topify.models.DarkModeHelper;
 
 public class LoginActivity extends AppCompatActivity {
     private FirebaseAuth auth;
@@ -43,6 +55,7 @@ public class LoginActivity extends AppCompatActivity {
     private TextView textViewRegistrar;
     private Button buttonLogin;
     private EditText editTextCorreo, editTextPass;
+    private FirestoreHelper firestoreHelper;
     private final ActivityResultLauncher<Intent> activityResultLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             new ActivityResultCallback<ActivityResult>() {
@@ -64,6 +77,8 @@ public class LoginActivity extends AppCompatActivity {
                                             String userID = user.getUid();
                                             String nombre = user.getDisplayName();
                                             String email = user.getEmail();
+                                            String fotoUrl = (user.getPhotoUrl() != null) ? user.getPhotoUrl().toString() : "";
+                                            FirestoreHelper.guardarUsuarioFirestore(userID,nombre,email,fotoUrl);
 
                                             navegarMainActivity();
                                         }
@@ -83,6 +98,8 @@ public class LoginActivity extends AppCompatActivity {
     @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        loadLocale();
+        DarkModeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_login);
@@ -168,14 +185,29 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navegarMainActivity() {
-        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            String uid = user.getUid();
+            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+            intent.putExtra("USER_UID", uid);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+        }
     }
 
     public boolean correoCorrecto(String correo){
         String correoRegex = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,6}$";
         return correo.matches(correoRegex);
     }
+    private void loadLocale() {
+        SharedPreferences preferences = getSharedPreferences("app_settings", MODE_PRIVATE);
+        String lang = preferences.getString("language", "es");
+        Locale locale = new Locale(lang);
+        Locale.setDefault(locale);
+        Configuration config = getResources().getConfiguration();
+        config.setLocale(locale);
+        getResources().updateConfiguration(config, getResources().getDisplayMetrics());
+    }
+
 }

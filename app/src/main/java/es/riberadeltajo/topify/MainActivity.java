@@ -3,6 +3,7 @@ package es.riberadeltajo.topify;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.Menu;
 import android.widget.Button;
@@ -16,7 +17,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
 
+import androidx.annotation.NonNull;
 import androidx.core.view.GravityCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
@@ -27,6 +30,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.AppCompatActivity;
 
 import es.riberadeltajo.topify.databinding.ActivityMainBinding;
+import es.riberadeltajo.topify.models.DarkModeHelper;
 import es.riberadeltajo.topify.models.ListaReproduccionViewModel;
 
 public class MainActivity extends AppCompatActivity {
@@ -42,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DarkModeHelper.applySavedTheme(this);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -56,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
 
         FirebaseUser user = auth.getCurrentUser();
 
+
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
 
@@ -65,15 +71,61 @@ public class MainActivity extends AppCompatActivity {
         imageViewPhoto = headerView.findViewById(R.id.imageViewFoto);
         logoutButton = headerView.findViewById(R.id.buttonLogout);
 
-        textViewNombre.setText(user.getDisplayName());
-        textViewEmail.setText(user.getEmail());
-        if (user.getPhotoUrl() != null) {
-            Glide.with(this)
-                    .load(user.getPhotoUrl())
-                    .into(imageViewPhoto);
-        }else{
-            imageViewPhoto.setImageResource(R.drawable.usuario);
+
+        if (user != null) {
+            boolean esGoogle = false;
+            for (com.google.firebase.auth.UserInfo profile : user.getProviderData()) {
+                if (profile.getProviderId().equals("google.com")) {
+                    esGoogle = true;
+                    break;
+                }
+            }
+
+            if (esGoogle) {
+                textViewNombre.setText(user.getDisplayName());
+                textViewEmail.setText(user.getEmail());
+
+                if (user.getPhotoUrl() != null) {
+                    Glide.with(this)
+                            .load(user.getPhotoUrl())
+                            .into(imageViewPhoto);
+                } else {
+                    imageViewPhoto.setImageResource(R.drawable.usuario);
+                }
+            } else {
+                FirebaseFirestore db = FirebaseFirestore.getInstance();
+                db.collection("usuarios").document(user.getUid())
+                        .get()
+                        .addOnSuccessListener(document -> {
+                            if (document.exists()) {
+                                String nombre = document.getString("nombre");
+                                String email = document.getString("email");
+                                String fotoUrl = document.getString("foto");
+
+                                textViewNombre.setText(nombre != null ? nombre : "Usuario");
+                                textViewEmail.setText(email != null ? email : user.getEmail());
+
+                                if (fotoUrl != null && !fotoUrl.isEmpty()) {
+                                    Glide.with(this)
+                                            .load(fotoUrl)
+                                            .into(imageViewPhoto);
+                                } else {
+                                    imageViewPhoto.setImageResource(R.drawable.usuario);
+                                }
+                            } else {
+                                textViewNombre.setText("Usuario");
+                                textViewEmail.setText(user.getEmail());
+                                imageViewPhoto.setImageResource(R.drawable.usuario);
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            textViewNombre.setText("Usuario");
+                            textViewEmail.setText(user.getEmail());
+                            imageViewPhoto.setImageResource(R.drawable.usuario);
+                        });
+            }
         }
+
 
         logoutButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -105,6 +157,20 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
+
+        if (id == R.id.action_settings) {
+            navController.navigate(R.id.nav_setting);
+            return true;
+        }
+
+
+        return super.onOptionsItemSelected(item);
     }
 
     private void cerrarSesion() {
