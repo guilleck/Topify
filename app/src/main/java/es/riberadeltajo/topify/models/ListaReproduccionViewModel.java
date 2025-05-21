@@ -3,6 +3,7 @@ package es.riberadeltajo.topify.models;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -12,15 +13,19 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import es.riberadeltajo.topify.SongDetailActivity;
 import es.riberadeltajo.topify.api.ApiService;
@@ -34,8 +39,13 @@ import retrofit2.converter.gson.GsonConverterFactory;
 public class ListaReproduccionViewModel extends AndroidViewModel {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
-    private MutableLiveData<List<String>> listaNombres = new MutableLiveData<>(new ArrayList<>());
-    private MutableLiveData<Map<String, List<DeezerTrackResponse.Track>>> listasConCanciones = new MutableLiveData<>(new HashMap<>());    private ListenerRegistration playlistsListener;
+    private final FirebaseStorage storage = FirebaseStorage.getInstance();
+    private final StorageReference storageRef = storage.getReference();
+
+    // Cambiar a MutableLiveData<List<ListaReproduccion>>
+    private MutableLiveData<List<ListaReproduccion>> listasReproduccion = new MutableLiveData<>(new ArrayList<>());
+    private MutableLiveData<Map<String, List<DeezerTrackResponse.Track>>> listasConCanciones = new MutableLiveData<>(new HashMap<>());
+    private ListenerRegistration playlistsListener;
     private Map<String, ListenerRegistration> cancionesListeners = new HashMap<>();
     private ApiService apiService;
     private MutableLiveData<DeezerTrackResponse.Track> detallesCancionCargados = new MutableLiveData<>();
@@ -82,14 +92,18 @@ public class ListaReproduccionViewModel extends AndroidViewModel {
                             return;
                         }
 
-                        List<String> nombresFirebase = new ArrayList<>();
+                        List<ListaReproduccion> nuevasListas = new ArrayList<>();
                         Map<String, List<DeezerTrackResponse.Track>> nuevasListasConCanciones = new HashMap<>();
                         if (value != null) {
                             for (QueryDocumentSnapshot doc : value) {
                                 String name = doc.getString("name");
+                                String imageUrl = doc.getString("imageUrl"); // Obtener la URL de la imagen
                                 String playlistId = doc.getId();
+
                                 if (name != null) {
-                                    nombresFirebase.add(name);
+                                    ListaReproduccion lista = new ListaReproduccion(playlistId, name, imageUrl); // Crear objeto ListaReproduccion
+                                    nuevasListas.add(lista);
+
                                     List<Map<String, Object>> cancionesData = (List<Map<String, Object>>) doc.get("songs");
                                     List<DeezerTrackResponse.Track> canciones = new ArrayList<>();
                                     if (cancionesData != null) {
@@ -114,11 +128,12 @@ public class ListaReproduccionViewModel extends AndroidViewModel {
                                 }
                             }
                         }
-                        listaNombres.setValue(nombresFirebase);
+                        listasReproduccion.setValue(nuevasListas); // Actualizar el LiveData de listas
                         listasConCanciones.setValue(nuevasListasConCanciones);
                     });
         }
     }
+
 
     public void obtenerDetallesCancion(long trackId, Context context) {
         Call<DeezerTrackResponse.Track> call = apiService.getTrackDetails(trackId);
@@ -127,14 +142,7 @@ public class ListaReproduccionViewModel extends AndroidViewModel {
             public void onResponse(Call<DeezerTrackResponse.Track> call, Response<DeezerTrackResponse.Track> response) {
                 if (response.isSuccessful() && response.body() != null) {
                     DeezerTrackResponse.Track trackDetails = response.body();
-
-                    Intent intent = new Intent(context, SongDetailActivity.class);
-                    intent.putExtra("title", trackDetails.title);
-                    intent.putExtra("artist", trackDetails.artist != null ? trackDetails.artist.name : "");
-                    intent.putExtra("coverUrl", trackDetails.album != null ? trackDetails.album.cover_big : "");
-                    intent.putExtra("duration", trackDetails.duration);
-                    intent.putExtra("previewUrl", trackDetails.preview);
-                    context.startActivity(intent);
+                    detallesCancionCargados.setValue(trackDetails); // Ahora lo manejamos en el fragmento
                 } else {
                     Toast.makeText(context, "Error al obtener detalles de la canción", Toast.LENGTH_SHORT).show();
                 }
@@ -159,21 +167,97 @@ public class ListaReproduccionViewModel extends AndroidViewModel {
         cancionesListeners.clear();
     }
 
-    public LiveData<List<String>> getListaNombres() {
-        return listaNombres;
+    public LiveData<List<ListaReproduccion>> getListasReproduccion() {
+        return listasReproduccion;
     }
 
-    public void agregarNuevaLista(String nombreLista) {
+    public void agregarNuevaLista(String nombreLista, Uri imageUri) {
         String userId = getCurrentUserId();
         if (userId != null) {
-            Map<String, Object> playlist = new HashMap<>();
-            playlist.put("userId", userId);
-            playlist.put("name", nombreLista);
-            getPlaylistsCollection().add(playlist)
-                    .addOnSuccessListener(documentReference -> Log.d("Firebase", "Playlist added with ID: " + documentReference.getId()))
-                    .addOnFailureListener(e -> Log.w("Firebase", "Error adding playlist", e));
+            if (imageUri != null) {
+                uploadImageAndAddPlaylist(userId, nombreLista, imageUri);
+            } else {
+
+                Map<String, Object> playlist = new HashMap<>();
+                playlist.put("userId", userId);
+                playlist.put("name", nombreLista);
+                playlist.put("imageUrl", "");
+                getPlaylistsCollection().add(playlist)
+                        .addOnSuccessListener(documentReference -> Log.d("Firebase", "Playlist added with ID: " + documentReference.getId()))
+                        .addOnFailureListener(e -> Log.w("Firebase", "Error adding playlist", e));
+            }
         }
     }
+
+
+    private void uploadImageAndAddPlaylist(String userId, String nombreLista, Uri imageUri) {
+        StorageReference imageRef = storageRef.child("playlist_covers/" + UUID.randomUUID().toString());
+        imageRef.putFile(imageUri)
+                .addOnSuccessListener(taskSnapshot -> imageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                    String imageUrl = uri.toString();
+                    Map<String, Object> playlist = new HashMap<>();
+                    playlist.put("userId", userId);
+                    playlist.put("name", nombreLista);
+                    playlist.put("imageUrl", imageUrl);
+                    getPlaylistsCollection().add(playlist)
+                            .addOnSuccessListener(documentReference -> Log.d("Firebase", "Playlist added with ID: " + documentReference.getId()))
+                            .addOnFailureListener(e -> Log.w("Firebase", "Error adding playlist", e));
+                }))
+                .addOnFailureListener(e -> Toast.makeText(getApplication().getApplicationContext(), "Error al subir la imagen: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    }
+
+    public void actualizarLista(String listaId, String nuevoNombre, Uri nuevaImageUri) {
+        String userId = getCurrentUserId();
+        if (userId == null) return;
+
+        DocumentReference playlistRef = getPlaylistsCollection().document(listaId);
+
+        if (nuevaImageUri != null && !nuevaImageUri.toString().startsWith("http")) { // Si la URI es nueva y no es una URL ya existente
+            // Eliminar la imagen antigua si existe (opcional, para limpieza de Storage)
+            // String oldImageUrl = getCurrentImageUrlForPlaylist(listaId); // Necesitarías un método para obtener la URL actual
+            // if (oldImageUrl != null && !oldImageUrl.isEmpty()) { /* delete old image */ }
+
+            StorageReference imageRef = storageRef.child("playlist_covers/" + UUID.randomUUID().toString());
+            imageRef.putFile(nuevaImageUri)
+                    .addOnSuccessListener(taskSnapshot -> imageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                        String imageUrl = uri.toString();
+                        playlistRef.update("name", nuevoNombre, "imageUrl", imageUrl)
+                                .addOnSuccessListener(aVoid -> Log.d("Firebase", "Playlist updated with new image: " + listaId))
+                                .addOnFailureListener(e -> Log.w("Firebase", "Error updating playlist with new image", e));
+                    }))
+                    .addOnFailureListener(e -> Toast.makeText(getApplication().getApplicationContext(), "Error al subir la nueva imagen: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        } else {
+            // Si no hay nueva imagen o la URI es una URL existente (no se cambió la imagen)
+            playlistRef.update("name", nuevoNombre)
+                    .addOnSuccessListener(aVoid -> Log.d("Firebase", "Playlist updated: " + listaId))
+                    .addOnFailureListener(e -> Log.w("Firebase", "Error updating playlist", e));
+        }
+    }
+
+
+    public void eliminarLista(String listaId) {
+        String userId = getCurrentUserId();
+        if (userId == null) return;
+
+        DocumentReference playlistRef = getPlaylistsCollection().document(listaId);
+        playlistRef.get().addOnSuccessListener(documentSnapshot -> {
+            if (documentSnapshot.exists()) {
+                String imageUrl = documentSnapshot.getString("imageUrl");
+                playlistRef.delete()
+                        .addOnSuccessListener(aVoid -> {
+                            Log.d("Firebase", "Playlist deleted: " + listaId);
+                            if (imageUrl != null && !imageUrl.isEmpty()) {
+                                // Eliminar la imagen de Storage
+                                StorageReference photoRef = storage.getReferenceFromUrl(imageUrl);
+                                photoRef.delete().addOnSuccessListener(aVoid1 -> Log.d("Firebase", "Image deleted from Storage"))
+                                        .addOnFailureListener(e -> Log.w("Firebase", "Error deleting image from Storage", e));
+                            }
+                        })
+                        .addOnFailureListener(e -> Log.w("Firebase", "Error deleting playlist", e));
+            }
+        }).addOnFailureListener(e -> Log.w("Firebase", "Error getting playlist to delete", e));
+    }
+
 
     public void agregarCancionALista(String nombreLista, DeezerTrackResponse.Track cancion) {
         Log.d("Firebase", "agregarCancionALista llamada para: " + cancion.title + " en la lista: " + nombreLista);
