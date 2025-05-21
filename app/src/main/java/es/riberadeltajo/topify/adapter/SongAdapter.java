@@ -1,9 +1,10 @@
 package es.riberadeltajo.topify.adapter;
 
+import android.content.res.Configuration;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -22,6 +23,7 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
     private List<DeezerTrackResponse.Track> songs;
     private OnItemClickListener listener;
     private OnItemLongClickListener longClickListener;
+    private boolean isDarkMode = false;
 
     public interface OnItemClickListener {
         void onItemClick(DeezerTrackResponse.Track song);
@@ -31,9 +33,12 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
         void onItemLongClick(DeezerTrackResponse.Track song);
     }
 
-
-    public SongAdapter(List<DeezerTrackResponse.Track> songs) {
+    public SongAdapter(List<DeezerTrackResponse.Track> songs, android.content.Context context) {
         this.songs = songs;
+
+        // Detectar modo oscuro
+        int nightModeFlags = context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        isDarkMode = nightModeFlags == Configuration.UI_MODE_NIGHT_YES;
     }
 
     public void updateSongs(List<DeezerTrackResponse.Track> newSongs) {
@@ -59,7 +64,7 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
     @Override
     public void onBindViewHolder(@NonNull SongViewHolder holder, int position) {
         DeezerTrackResponse.Track song = songs.get(position);
-        holder.bind(song);
+        holder.bind(song, isDarkMode);
     }
 
     @Override
@@ -71,12 +76,14 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
         TextView textTitle, textArtist;
         ImageView imageCover;
         DeezerTrackResponse.Track currentSong;
+        View rootView;
 
         public SongViewHolder(@NonNull View itemView) {
             super(itemView);
             textTitle = itemView.findViewById(R.id.textTitle);
             textArtist = itemView.findViewById(R.id.textArtist);
             imageCover = itemView.findViewById(R.id.imageCover);
+            rootView = itemView;
 
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();
@@ -89,20 +96,28 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
                 int position = getAdapterPosition();
                 if (longClickListener != null && position != RecyclerView.NO_POSITION) {
                     longClickListener.onItemLongClick(currentSong);
+                    return true;
                 }
-                return true;
+                return false;
             });
         }
 
-        public void bind(DeezerTrackResponse.Track song) {
+        public void bind(DeezerTrackResponse.Track song, boolean isDarkMode) {
             currentSong = song;
-            String title = song.title;
-            String artist = song.artist.name;
-            String imageUrl = song.album.cover_big;
+            textTitle.setText(song.title);
+            textArtist.setText(song.artist.name);
+            Glide.with(itemView.getContext()).load(song.album.cover_big).into(imageCover);
 
-            textTitle.setText(title);
-            textArtist.setText(artist);
-            Glide.with(itemView.getContext()).load(imageUrl).into(imageCover);
+            // Colores dinámicos según el modo
+            if (isDarkMode) {
+                rootView.setBackgroundColor(Color.parseColor("#1E1E1E"));
+                textTitle.setTextColor(Color.WHITE);
+                textArtist.setTextColor(Color.LTGRAY);
+            } else {
+                rootView.setBackgroundColor(Color.WHITE);
+                textTitle.setTextColor(Color.BLACK);
+                textArtist.setTextColor(Color.DKGRAY);
+            }
         }
     }
 }

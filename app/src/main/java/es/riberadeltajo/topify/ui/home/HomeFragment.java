@@ -50,7 +50,7 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
         // Configurar RecyclerView
         RecyclerView recyclerView = binding.recyclerSongs;
         recyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
-        adapter = new SongAdapter(new ArrayList<>());
+        adapter = new SongAdapter(new ArrayList<>(),requireContext());
         adapter.setOnItemClickListener(this);
         adapter.setOnItemLongClickListener(this);
         recyclerView.setAdapter(adapter);

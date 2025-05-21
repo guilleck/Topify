@@ -2,6 +2,7 @@ package es.riberadeltajo.topify.adapter;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.ViewModelProvider;
@@ -20,6 +22,10 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 
 import es.riberadeltajo.topify.R;
 import es.riberadeltajo.topify.SongDetailActivity;
@@ -31,12 +37,19 @@ import java.util.List;
 
 public class SearchResultsAdapter extends ListAdapter<SearchResult.Item, SearchResultsAdapter.SearchResultViewHolder> {
 
+    public interface OnSearchResultLongClickListener {
+        void onSearchResultLongClick(DeezerTrackResponse.Track song);
+    }
+
     private final Context context;
     private final LifecycleOwner lifecycleOwner;
     private ListaReproduccionViewModel listaReproduccionViewModel;
-    private boolean isLongClickActive = false; // Variable para controlar la pulsación larga
+    private boolean isLongClickActive = false;
+    private final OnSearchResultLongClickListener longClickListener;
 
-    public SearchResultsAdapter(@NonNull Context context, @NonNull LifecycleOwner lifecycleOwner) {
+
+
+    public SearchResultsAdapter(@NonNull Context context, @NonNull LifecycleOwner lifecycleOwner, @NonNull OnSearchResultLongClickListener longClickListener) {
         super(new DiffUtil.ItemCallback<SearchResult.Item>() {
             @Override
             public boolean areItemsTheSame(@NonNull SearchResult.Item oldItem, @NonNull SearchResult.Item newItem) {
@@ -50,6 +63,7 @@ public class SearchResultsAdapter extends ListAdapter<SearchResult.Item, SearchR
         });
         this.context = context;
         this.lifecycleOwner = lifecycleOwner;
+        this.longClickListener = longClickListener; // Asignar el listener
     }
 
     @NonNull
@@ -65,13 +79,37 @@ public class SearchResultsAdapter extends ListAdapter<SearchResult.Item, SearchR
         SearchResult.Item currentItem = getItem(position);
         if (currentItem != null) {
             holder.titleTextView.setText(currentItem.getTitle() != null ? currentItem.getTitle() : currentItem.getName());
-            String imageUrl = currentItem.getCoverBig();
+            String imageUrl = null;
             Log.d("SearchResultsAdapter", "URL de la imagen: " + imageUrl);
 
-            if (imageUrl != null) {
+            if ("track".equals(currentItem.getType()) && currentItem.getAlbum() != null && currentItem.getAlbum().getCoverBig() != null) {
+                imageUrl = currentItem.getAlbum().getCoverBig();
+            } else if (currentItem.getCoverBig() != null) {
+                imageUrl = currentItem.getCoverBig();
+            }
+
+            Log.d("SearchResultsAdapter", "URL de la imagen: " + (imageUrl != null ? imageUrl : "NULA")); // Log más descriptivo
+
+            if (imageUrl != null && !imageUrl.isEmpty()) {
                 Glide.with(context)
                         .load(imageUrl)
+
+                        .listener(new RequestListener<Drawable>() {
+                            @Override
+                            public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
+                                Log.e("SearchResultsAdapter", "Error al cargar la imagen: " + (e != null ? e.getMessage() : "Error desconocido"));
+                                return false;
+                            }
+
+                            @Override
+                            public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                                Log.d("SearchResultsAdapter", "Imagen cargada con éxito desde: " + dataSource.name());
+                                return false;
+                            }
+                        })
                         .into(holder.coverImageView);
+            } else {
+                holder.coverImageView.setImageResource(R.drawable.musica);
             }
 
             String subtitle = "";
@@ -92,8 +130,11 @@ public class SearchResultsAdapter extends ListAdapter<SearchResult.Item, SearchR
 
             holder.itemView.setOnLongClickListener(v -> {
                 if ("track".equals(currentItem.getType()) && !isLongClickActive) {
-                    isLongClickActive = true; // Marca que la pulsación larga está activa
-                    mostrarDialogoAñadirALista(currentItem);
+                    isLongClickActive = true;
+                    // Convertir SearchResult.Item a DeezerTrackResponse.Track para pasarlo al Fragment
+                    DeezerTrackResponse.Track song = convertirSearchResultATrack(currentItem);
+                    longClickListener.onSearchResultLongClick(song); // 3. Notificar al Fragment
+
                     holder.itemView.setOnTouchListener((view, event) -> {
                         if (event.getAction() == android.view.MotionEvent.ACTION_UP || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
                             isLongClickActive = false; // Resetea la bandera al levantar el dedo
@@ -108,29 +149,6 @@ public class SearchResultsAdapter extends ListAdapter<SearchResult.Item, SearchR
         }
     }
 
-    private void mostrarDialogoAñadirALista(SearchResult.Item cancionItem) {
-        if (listaReproduccionViewModel == null) {
-            listaReproduccionViewModel = new ViewModelProvider((ViewModelStoreOwner) context).get(ListaReproduccionViewModel.class);
-        }
-
-        listaReproduccionViewModel.getListaNombres().observe(lifecycleOwner, listaNombres -> {
-            if (listaNombres != null && !listaNombres.isEmpty()) {
-                new AlertDialog.Builder(context)
-                        .setTitle("Añadir a lista")
-                        .setItems(listaNombres.toArray(new String[0]), (dialog, which) -> {
-                            String nombreListaSeleccionada = listaNombres.get(which);
-                            DeezerTrackResponse.Track trackToAdd = convertirSearchResultATrack(cancionItem);
-                            listaReproduccionViewModel.agregarCancionALista(nombreListaSeleccionada, trackToAdd);
-                            Toast.makeText(context, cancionItem.getTitle() + " añadido a " + nombreListaSeleccionada, Toast.LENGTH_SHORT).show();
-                            return;
-                        })
-                        .setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss())
-                        .show();
-            } else {
-                Toast.makeText(context, "No hay listas de reproducción creadas", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
 
     private DeezerTrackResponse.Track convertirSearchResultATrack(SearchResult.Item item) {
         DeezerTrackResponse.Track track = new DeezerTrackResponse.Track();
