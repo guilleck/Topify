@@ -72,5 +72,7 @@ dependencies {
     implementation ("com.google.code.gson:gson:2.8.8")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.16.0")
     implementation ("com.google.firebase:firebase-auth")
+    implementation ("androidx.activity:activity-ktx:1.9.0")
+    implementation ("androidx.fragment:fragment-ktx:1.8.0")
 
 }

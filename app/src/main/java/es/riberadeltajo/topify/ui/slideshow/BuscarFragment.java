@@ -4,7 +4,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,14 +21,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import es.riberadeltajo.topify.R;
 import es.riberadeltajo.topify.adapter.SearchResultsAdapter;
 import es.riberadeltajo.topify.models.BuscarViewModel;
 import es.riberadeltajo.topify.models.DeezerTrackResponse;
 import es.riberadeltajo.topify.models.ListaReproduccionViewModel;
-import es.riberadeltajo.topify.models.ListaReproduccion;
 import es.riberadeltajo.topify.models.SearchResult;
 
 public class BuscarFragment extends Fragment implements SearchResultsAdapter.OnSearchResultLongClickListener{
@@ -81,51 +78,48 @@ public class BuscarFragment extends Fragment implements SearchResultsAdapter.OnS
 
     }
 
-    @Override
     public void onSearchResultLongClick(DeezerTrackResponse.Track song) {
-        Log.d("BuscarFragment", "Long click en canción: " + song.title); // Para depuración
+        final Observer<List<String>> listaNombresObserver = new Observer<List<String>>() {
+            @Override
+            public void onChanged(List<String> nombresListas) {
+                listaReproduccionViewModel.getListaNombres().removeObserver(this);
+
+                if (nombresListas != null && !nombresListas.isEmpty()) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                    builder.setTitle("Añadir a lista de reproducción");
+
+                    final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(getContext(), android.R.layout.select_dialog_singlechoice);
+                    arrayAdapter.addAll(nombresListas);
+
+                    builder.setAdapter(arrayAdapter, (dialog, which) -> {
+                        String listaSeleccionada = nombresListas.get(which);
+                        listaReproduccionViewModel.agregarCancionALista(listaSeleccionada, song);
+                        Toast.makeText(getContext(), "Añadido a " + listaSeleccionada, Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                        currentDialog = null;
+                    });
+
+                    builder.setNegativeButton("Cancelar", (dialog, which) -> {
+                        dialog.dismiss();
+                        currentDialog = null;
+                    });
+
+                    currentDialog = builder.create();
+                    currentDialog.show();
+                } else {
+                    Toast.makeText(getContext(), "No hay listas de reproducción creadas", Toast.LENGTH_SHORT).show();
+                }
+            }
+        };
+
 
         if (currentDialog != null && currentDialog.isShowing()) {
             currentDialog.dismiss();
             currentDialog = null;
         }
 
-        // Observar las listas de reproducción del ViewModel
-        listaReproduccionViewModel.getListasReproduccion().observe(getViewLifecycleOwner(), listas -> {
-            if (listas != null && !listas.isEmpty()) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-                builder.setTitle("Añadir a lista de reproducción");
 
-                // Mapear los objetos ListaReproduccion a sus nombres para el ArrayAdapter
-                List<String> nombresListas = listas.stream()
-                        .map(ListaReproduccion::getName) // Usar getName() del objeto ListaReproduccion
-                        .collect(Collectors.toList());
-
-                final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(getContext(), android.R.layout.select_dialog_singlechoice);
-                arrayAdapter.addAll(nombresListas);
-
-                builder.setAdapter(arrayAdapter, (dialog, which) -> {
-                    String listaSeleccionada = nombresListas.get(which); // Obtener el nombre de la lista seleccionada
-                    listaReproduccionViewModel.agregarCancionALista(listaSeleccionada, song);
-                    Toast.makeText(getContext(), "Añadido a " + listaSeleccionada, Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                    currentDialog = null;
-                });
-
-                builder.setNegativeButton("Cancelar", (dialog, which) -> {
-                    dialog.dismiss();
-                    currentDialog = null;
-                });
-
-                currentDialog = builder.create();
-                if (!currentDialog.isShowing()) { // Evitar IllegalStateException si ya se muestra
-                    currentDialog.show();
-                }
-            } else {
-                Toast.makeText(getContext(), "No hay listas de reproducción creadas", Toast.LENGTH_SHORT).show();
-            }
-
-        });
+        listaReproduccionViewModel.getListaNombres().observe(getViewLifecycleOwner(), listaNombresObserver);
     }
 
     @Override

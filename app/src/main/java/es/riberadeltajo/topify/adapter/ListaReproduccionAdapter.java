@@ -11,14 +11,16 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import es.riberadeltajo.topify.R;
-import es.riberadeltajo.topify.models.ListaReproduccion;
 
 public class ListaReproduccionAdapter extends RecyclerView.Adapter<ListaReproduccionAdapter.ViewHolder> {
 
-    private List<ListaReproduccion> listaReproducciones;
+    private List<String> listaReproducciones;
+    private Map<String, String> listaFotos;
     private OnListaClickListener listener;
     private OnListaLongClickListener longClickListener;
 
@@ -26,12 +28,21 @@ public class ListaReproduccionAdapter extends RecyclerView.Adapter<ListaReproduc
         void onListaClick(String nombreLista);
     }
 
-    public interface OnListaLongClickListener { // Nueva interfaz para clic largo
-        void onListaLongClick(ListaReproduccion lista);
+    public interface OnListaLongClickListener { // Nueva interfaz
+        void onListaLongClick(String nombreLista);
     }
 
-    public ListaReproduccionAdapter(List<ListaReproduccion> listaReproducciones, OnListaClickListener listener, OnListaLongClickListener longClickListener) {
+
+    public ListaReproduccionAdapter(List<String> listaReproducciones, OnListaClickListener listener, OnListaLongClickListener longClickListener) {
         this.listaReproducciones = listaReproducciones;
+        this.listener = listener;
+        this.longClickListener = longClickListener;
+        this.listaFotos = new HashMap<>(); // Inicializar aquí o pasarlo en el constructor
+    }
+
+    public ListaReproduccionAdapter(List<String> listaReproducciones, Map<String, String> listaFotos, OnListaClickListener listener, OnListaLongClickListener longClickListener) {
+        this.listaReproducciones = listaReproducciones;
+        this.listaFotos = listaFotos;
         this.listener = listener;
         this.longClickListener = longClickListener;
     }
@@ -45,55 +56,53 @@ public class ListaReproduccionAdapter extends RecyclerView.Adapter<ListaReproduc
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        ListaReproduccion lista = listaReproducciones.get(position); // Obtener el objeto ListaReproduccion
-        holder.textViewNombreLista.setText(lista.getName()); // Usar getName() del modelo
+        String nombreLista = listaReproducciones.get(position);
+        holder.textViewNombreLista.setText(nombreLista);
 
-
-        if (lista.getImageUrl() != null && !lista.getImageUrl().isEmpty()) {
+        // Cargar la imagen si existe una URL
+        String fotoUrl = listaFotos.get(nombreLista);
+        if (fotoUrl != null && !fotoUrl.isEmpty()) {
             Glide.with(holder.itemView.getContext())
-                    .load(lista.getImageUrl())
+                    .load(fotoUrl)
 
-                    .into(holder.imageViewCover);
+                    .into(holder.imageViewListaCover);
         } else {
-            holder.imageViewCover.setImageResource(R.drawable.musica); // Si no hay URL, usa la por defecto
+            holder.imageViewListaCover.setImageResource(R.drawable.musica); // Mostrar imagen por defecto
         }
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
-                listener.onListaClick(lista.getName());
+                listener.onListaClick(nombreLista);
             }
         });
 
-        // Manejar el clic largo
         holder.itemView.setOnLongClickListener(v -> {
             if (longClickListener != null) {
-                longClickListener.onListaLongClick(lista);
-                return true; // Consumir el evento
+                longClickListener.onListaLongClick(nombreLista);
+                return true;
             }
             return false;
         });
     }
-
 
     @Override
     public int getItemCount() {
         return listaReproducciones.size();
     }
 
+    public void setListaFotos(Map<String, String> listaFotos) {
+        this.listaFotos = listaFotos;
+        notifyDataSetChanged();
+    }
+
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView textViewNombreLista;
-        ImageView imageViewCover; // Añadir ImageView
+        ImageView imageViewListaCover; // Añadir ImageView
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             textViewNombreLista = itemView.findViewById(R.id.textViewNombreLista);
-            imageViewCover = itemView.findViewById(R.id.imageViewCover); // Inicializar ImageView
+            imageViewListaCover = itemView.findViewById(R.id.imageViewListaCover); // Asignar ImageView
         }
-    }
-
-    // Método para actualizar los datos del adaptador
-    public void setListas(List<ListaReproduccion> nuevasListas) {
-        this.listaReproducciones = nuevasListas;
-        notifyDataSetChanged();
     }
 }

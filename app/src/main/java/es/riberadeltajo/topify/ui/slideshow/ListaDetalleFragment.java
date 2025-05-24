@@ -77,7 +77,7 @@ public class ListaDetalleFragment extends Fragment {
         });
 
         viewModel.getDetallesCancionCargados().observe(getViewLifecycleOwner(), trackDetails -> {
-            if (trackDetails != null) {
+            if (trackDetails != null && cancionSeleccionada != null && trackDetails.deezer_id == cancionSeleccionada.deezer_id) {
                 Intent intent = new Intent(requireContext(), SongDetailActivity.class);
                 intent.putExtra("title", trackDetails.title);
                 intent.putExtra("artist", trackDetails.artist != null ? trackDetails.artist.name : "Desconocido");
@@ -85,7 +85,9 @@ public class ListaDetalleFragment extends Fragment {
                 intent.putExtra("duration", trackDetails.duration);
                 intent.putExtra("previewUrl", trackDetails.preview);
                 startActivity(intent);
+                // Resetea el LiveData para evitar múltiples inicios si la misma canción se selecciona de nuevo rápidamente
                 viewModel.resetDetallesCancionCargados();
+                cancionSeleccionada = null;
             }
         });
 

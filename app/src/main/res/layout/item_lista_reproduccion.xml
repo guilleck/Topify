@@ -3,25 +3,23 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="16dp"
-    android:background="?android:attr/selectableItemBackground"
-    android:clickable="true"
-    android:focusable="true">
+    android:padding="8dp"
+    android:gravity="center_vertical">
 
     <ImageView
-        android:id="@+id/imageViewCover"
+        android:id="@+id/imageViewListaCover"
         android:layout_width="60dp"
         android:layout_height="60dp"
         android:scaleType="centerCrop"
- /> <TextView
+        android:src="@drawable/musica" /> <TextView
     android:id="@+id/textViewNombreLista"
     android:layout_width="0dp"
     android:layout_height="wrap_content"
     android:layout_weight="1"
-    android:layout_gravity="center_vertical"
     android:layout_marginStart="16dp"
+    android:text="Nombre de la Lista"
     android:textSize="18sp"
     android:textStyle="bold"
-    android:text="Nombre de la Lista" />
+    android:textColor="@android:color/black"/>
 
 </LinearLayout>

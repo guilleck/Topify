@@ -19,7 +19,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 import es.riberadeltajo.topify.SongDetailActivity;
 import es.riberadeltajo.topify.adapter.SongAdapter;
@@ -27,7 +26,6 @@ import es.riberadeltajo.topify.api.ApiService;
 import es.riberadeltajo.topify.databinding.FragmentHomeBinding;
 import es.riberadeltajo.topify.models.DeezerTrackResponse;
 import es.riberadeltajo.topify.models.ListaReproduccionViewModel;
-import es.riberadeltajo.topify.models.ListaReproduccion;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -109,7 +107,13 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
 
     @Override
     public void onItemClick(DeezerTrackResponse.Track song) {
-        viewModel.obtenerDetallesCancion(song.deezer_id, requireContext());
+        Intent intent = new Intent(getContext(), SongDetailActivity.class);
+        intent.putExtra("title", song.title);
+        intent.putExtra("artist", song.artist.name);
+        intent.putExtra("coverUrl", song.album.cover_big);
+        intent.putExtra("duration", song.duration);
+        intent.putExtra("previewUrl", song.preview);
+        startActivity(intent);
     }
 
     @Override
@@ -119,31 +123,19 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
 
         final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(getContext(), android.R.layout.select_dialog_singlechoice);
 
-        // Observar las listas de reproducción del ViewModel
-        viewModel.getListasReproduccion().observe(getViewLifecycleOwner(), listas -> { //
-            arrayAdapter.clear();
-            if (listas != null) {
-
-                List<String> nombresListas = listas.stream()
-                        .map(ListaReproduccion::getName)
-                        .collect(Collectors.toList());
-                arrayAdapter.addAll(nombresListas);
-            }
-            arrayAdapter.notifyDataSetChanged();
-        });
-
+        // Obtener los nombres de las listas del ViewModel
+        List<String> nombresListas = viewModel.getListaNombres().getValue();
+        if (nombresListas != null) {
+            arrayAdapter.addAll(nombresListas);
+        }
 
         builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.cancel());
 
         builder.setAdapter(arrayAdapter, (dialog, which) -> {
-            // Es importante obtener la lista actualizada de nombres directamente del adaptador
-            // para evitar problemas si el LiveData se ha actualizado después de crear el arrayAdapter inicial.
-            String listaSeleccionada = arrayAdapter.getItem(which);
-            if (listaSeleccionada != null) {
-                viewModel.agregarCancionALista(listaSeleccionada, song); //
-                Toast.makeText(getContext(), "Añadido a " + listaSeleccionada, Toast.LENGTH_SHORT).show();
-                Log.d("AñadirCancion", "Canción '" + song.title + "' añadida a '" + listaSeleccionada + "'");
-            }
+            String listaSeleccionada = nombresListas.get(which);
+            viewModel.agregarCancionALista(listaSeleccionada, song); // Asegúrate de que esta línea esté aquí
+            Toast.makeText(getContext(), "Añadido a " + listaSeleccionada, Toast.LENGTH_SHORT).show();
+            Log.d("AñadirCancion", "Canción '" + song.title + "' añadida a '" + listaSeleccionada + "'");
         });
 
         builder.show();
