@@ -6,6 +6,36 @@
     app:startDestination="@+id/nav_topCanciones">
 
     <fragment
+        android:id="@+id/userProfileFragment"
+        android:name="es.riberadeltajo.topify.ui.slideshow.UserProfileFragment"
+        android:label="Perfil de Usuario"
+        tools:layout="@layout/fragment_user_profile">
+        <argument
+            android:name="userId"
+            app:argType="string" />
+        <argument
+            android:name="userName"
+            app:argType="string"
+            android:defaultValue="Usuario Desconocido" />
+        <argument
+            android:name="profileImageUrl"
+            app:argType="string"
+            android:defaultValue="@null" />
+        <action
+            android:id="@+id/action_userProfileFragment_to_playlistDetailFragment"
+            app:destination="@id/playlistDetailFragment" /> </fragment>
+    <fragment
+        android:id="@+id/playlistDetailFragment"
+        android:name="es.riberadeltajo.topify.ui.slideshow.PlaylistDetailFragment"
+        android:label="Detalle de Playlist"
+        tools:layout="@layout/fragment_playlist_detail">
+        <argument
+            android:name="PLAYLIST_ID"
+            app:argType="string" />
+    </fragment>
+
+
+    <fragment
         android:id="@+id/nav_topCanciones"
         android:name="es.riberadeltajo.topify.ui.home.HomeFragment"
         android:label="@string/menu_home"
@@ -44,5 +74,15 @@
         <argument
             android:name="nombreLista"
             app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_searchUsersFragment"
+        android:name="es.riberadeltajo.topify.ui.slideshow.UserSearchFragment"
+        android:label="Buscar Usuarios"
+        tools:layout="@layout/fragment_user_search" >
+        <action
+            android:id="@+id/action_searchUsersFragment_to_userProfileFragment"
+            app:destination="@id/userProfileFragment" />
     </fragment>
 </navigation>
