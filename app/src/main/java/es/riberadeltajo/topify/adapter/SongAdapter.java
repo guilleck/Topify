@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -17,26 +18,28 @@ import java.util.List;
 
 import es.riberadeltajo.topify.R;
 import es.riberadeltajo.topify.models.DeezerTrackResponse;
+import es.riberadeltajo.topify.models.Song;
 
 public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder> {
 
     private List<DeezerTrackResponse.Track> songs;
     private OnItemClickListener listener;
-    private OnItemLongClickListener longClickListener;
+    private OnAddButtonClickListener addButtonClickListener;
     private boolean isDarkMode = false;
 
     public interface OnItemClickListener {
         void onItemClick(DeezerTrackResponse.Track song);
     }
 
-    public interface OnItemLongClickListener {
-        void onItemLongClick(DeezerTrackResponse.Track song);
+    public interface OnAddButtonClickListener {
+        void onAddButtonClick(DeezerTrackResponse.Track song);
     }
+
 
     public SongAdapter(List<DeezerTrackResponse.Track> songs, android.content.Context context) {
         this.songs = songs;
 
-        // Detectar modo oscuro
+
         int nightModeFlags = context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
         isDarkMode = nightModeFlags == Configuration.UI_MODE_NIGHT_YES;
     }
@@ -50,8 +53,8 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
         this.listener = listener;
     }
 
-    public void setOnItemLongClickListener(OnItemLongClickListener listener) {
-        this.longClickListener = listener;
+    public void setOnAddButtonClickListener(OnAddButtonClickListener listener) {
+        this.addButtonClickListener = listener;
     }
 
     @NonNull
@@ -75,6 +78,7 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
     public class SongViewHolder extends RecyclerView.ViewHolder {
         TextView textTitle, textArtist;
         ImageView imageCover;
+        ImageButton buttonAdd;
         DeezerTrackResponse.Track currentSong;
         View rootView;
 
@@ -83,6 +87,7 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
             textTitle = itemView.findViewById(R.id.textTitle);
             textArtist = itemView.findViewById(R.id.textArtist);
             imageCover = itemView.findViewById(R.id.imageCover);
+            buttonAdd = itemView.findViewById(R.id.buttonAdd);
             rootView = itemView;
 
             itemView.setOnClickListener(v -> {
@@ -92,13 +97,11 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.SongViewHolder
                 }
             });
 
-            itemView.setOnLongClickListener(v -> {
+            buttonAdd.setOnClickListener(v -> {
                 int position = getAdapterPosition();
-                if (longClickListener != null && position != RecyclerView.NO_POSITION) {
-                    longClickListener.onItemLongClick(currentSong);
-                    return true;
+                if (addButtonClickListener != null && position != RecyclerView.NO_POSITION) {
+                    addButtonClickListener.onAddButtonClick(currentSong);
                 }
-                return false;
             });
         }
 

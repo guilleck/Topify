@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import es.riberadeltajo.topify.MainActivity;
 import es.riberadeltajo.topify.SongDetailActivity;
 import es.riberadeltajo.topify.adapter.SongAdapter;
 import es.riberadeltajo.topify.api.ApiService;
@@ -32,7 +33,7 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-public class HomeFragment extends Fragment implements SongAdapter.OnItemClickListener, SongAdapter.OnItemLongClickListener {
+public class HomeFragment extends Fragment implements SongAdapter.OnItemClickListener, SongAdapter.OnAddButtonClickListener {
 
     private FragmentHomeBinding binding;
     private SongAdapter adapter;
@@ -52,7 +53,7 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
         recyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
         adapter = new SongAdapter(new ArrayList<>(),requireContext());
         adapter.setOnItemClickListener(this);
-        adapter.setOnItemLongClickListener(this);
+        adapter.setOnAddButtonClickListener(this);
         recyclerView.setAdapter(adapter);
 
         // Obtener el ViewModel compartido
@@ -106,6 +107,14 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).updateToolbarTitleWithCountry();
+        }
+    }
+
+    @Override
     public void onItemClick(DeezerTrackResponse.Track song) {
         Intent intent = new Intent(getContext(), SongDetailActivity.class);
         intent.putExtra("title", song.title);
@@ -113,17 +122,17 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
         intent.putExtra("coverUrl", song.album.cover_big);
         intent.putExtra("duration", song.duration);
         intent.putExtra("previewUrl", song.preview);
+        intent.putExtra("deezerId", song.deezer_id);
         startActivity(intent);
     }
 
     @Override
-    public void onItemLongClick(DeezerTrackResponse.Track song) {
+    public void onAddButtonClick(DeezerTrackResponse.Track song) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Añadir a lista de reproducción");
 
         final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(getContext(), android.R.layout.select_dialog_singlechoice);
 
-        // Obtener los nombres de las listas del ViewModel
         List<String> nombresListas = viewModel.getListaNombres().getValue();
         if (nombresListas != null) {
             arrayAdapter.addAll(nombresListas);
@@ -133,7 +142,7 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
 
         builder.setAdapter(arrayAdapter, (dialog, which) -> {
             String listaSeleccionada = nombresListas.get(which);
-            viewModel.agregarCancionALista(listaSeleccionada, song); // Asegúrate de que esta línea esté aquí
+            viewModel.agregarCancionALista(listaSeleccionada, song);
             Toast.makeText(getContext(), "Añadido a " + listaSeleccionada, Toast.LENGTH_SHORT).show();
             Log.d("AñadirCancion", "Canción '" + song.title + "' añadida a '" + listaSeleccionada + "'");
         });

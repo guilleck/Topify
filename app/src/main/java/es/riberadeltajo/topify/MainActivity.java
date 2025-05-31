@@ -10,6 +10,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+
 import com.bumptech.glide.Glide;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -20,6 +21,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.GravityCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
@@ -28,6 +30,8 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.Locale;
 
 import es.riberadeltajo.topify.databinding.ActivityMainBinding;
 import es.riberadeltajo.topify.models.DarkModeHelper;
@@ -41,7 +45,8 @@ public class MainActivity extends AppCompatActivity {
     private com.google.android.material.imageview.ShapeableImageView imageViewPhoto;
     private FirebaseAuth auth;
     private GoogleSignInClient googleSignInClient;
-    private Button logoutButton;
+    private Toolbar toolbar;
+
     @SuppressLint("WrongViewCast")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,13 +56,14 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        setSupportActionBar(binding.appBarMain.toolbar);
+        toolbar = binding.appBarMain.toolbar; // Inicializar Toolbar
+        setSupportActionBar(toolbar);
 
         ListaReproduccionViewModel viewModel = new ViewModelProvider(this).get(ListaReproduccionViewModel.class);
 
 
         auth = FirebaseAuth.getInstance();
-        googleSignInClient = GoogleSignIn.getClient(this, GoogleSignInOptions.DEFAULT_SIGN_IN);
+
 
         FirebaseUser user = auth.getCurrentUser();
 
@@ -69,7 +75,7 @@ public class MainActivity extends AppCompatActivity {
         textViewNombre = headerView.findViewById(R.id.textViewNombre);
         textViewEmail = headerView.findViewById(R.id.textViewCorreo);
         imageViewPhoto = headerView.findViewById(R.id.imageViewFoto);
-        logoutButton = headerView.findViewById(R.id.buttonLogout);
+
 
 
         if (user != null) {
@@ -127,12 +133,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        logoutButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                cerrarSesion();
-            }
-        });
+
 
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         mAppBarConfiguration = new AppBarConfiguration.Builder(
@@ -150,13 +151,15 @@ public class MainActivity extends AppCompatActivity {
                 navController.navigate(R.id.nav_buscarCanciones);
             } else if (id == R.id.nav_lista) {
                 navController.navigate(R.id.nav_listasReproduccion);
+            }else if(id == R.id.nav_usuario){
+                navController.navigate(R.id.nav_searchUsersFragment);
             }
 
             drawer.closeDrawer(GravityCompat.START);
             return true;
         });
 
-
+        updateToolbarTitleWithCountry();
     }
 
     @Override
@@ -173,20 +176,6 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private void cerrarSesion() {
-        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            Toast.makeText(MainActivity.this, "Sesión cerrada en Google", Toast.LENGTH_SHORT).show();
-            auth.signOut();
-            irAlLogin();
-        });
-    }
-
-    private void irAlLogin() {
-        Intent intent = new Intent(MainActivity.this, LoginActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -200,5 +189,18 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         return NavigationUI.navigateUp(navController, mAppBarConfiguration)
                 || super.onSupportNavigateUp();
+    }
+
+    private String getCountryName(String countryCode) {
+        Locale locale = new Locale("", countryCode);
+        return locale.getDisplayCountry(Locale.getDefault());
+    }
+
+    public void updateToolbarTitleWithCountry() {
+        String countryCode = Locale.getDefault().getCountry();
+        String countryName = getCountryName(countryCode);
+        if (toolbar != null) {
+            toolbar.setTitle("Top Canciones (" + countryName + ")");
+        }
     }
 }

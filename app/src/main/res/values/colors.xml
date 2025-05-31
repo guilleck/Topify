@@ -19,4 +19,8 @@
 
     <color name="dark_popup_bg">#333333</color>
 
+
+
+    <color name="color_primary_light">#6200EE</color> <color name="color_primary_dark_light">#3700B3</color> <color name="color_background_light">#F5F5F5</color> <color name="color_card_background_light">#FFFFFF</color> <color name="color_text_light">#212121</color> <color name="color_text_secondary_light">#757575</color> <color name="color_divider_light">#E0E0E0</color> <color name="color_primary_dark">#BB86FC</color> <color name="color_primary_dark_dark">#3700B3</color> <color name="color_background_dark">#121212</color> <color name="color_card_background_dark">#1E1E1E</color> <color name="color_text_dark">#FFFFFF</color> <color name="color_text_secondary_dark">#B0B0B0</color> <color name="color_divider_dark">#424242</color>
+
 </resources>

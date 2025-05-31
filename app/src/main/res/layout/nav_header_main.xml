@@ -45,14 +45,6 @@
         android:textSize="16sp"
         android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/buttonLogout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:backgroundTint="#00FFFFFF"
-        android:text="Logout"
-        android:textAlignment="center"
-        app:strokeColor="#FDF8F8"
-        app:strokeWidth="3dp" />
+
 
 </LinearLayout>

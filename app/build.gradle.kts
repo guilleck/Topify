@@ -74,5 +74,6 @@ dependencies {
     implementation ("com.google.firebase:firebase-auth")
     implementation ("androidx.activity:activity-ktx:1.9.0")
     implementation ("androidx.fragment:fragment-ktx:1.8.0")
+    implementation ("de.hdodenhof:circleimageview:3.1.0")
 
 }
