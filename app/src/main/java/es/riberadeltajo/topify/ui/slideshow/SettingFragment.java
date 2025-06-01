@@ -40,7 +40,7 @@ public class SettingFragment extends Fragment {
 
     private Switch switchDarkMode;
     private Spinner spinnerLanguage;
-    private Button logoutButton;
+
     private GoogleSignInClient googleSignInClient;
     private FirebaseAuth auth;
 
@@ -49,7 +49,6 @@ public class SettingFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_settings, container, false);
-        logoutButton = root.findViewById(R.id.buttonLogout);
         googleSignInClient = GoogleSignIn.getClient(requireActivity(), GoogleSignInOptions.DEFAULT_SIGN_IN);
         auth = FirebaseAuth.getInstance();
 
@@ -64,12 +63,7 @@ public class SettingFragment extends Fragment {
             requireActivity().recreate();
         });
 
-        logoutButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                cerrarSesion();
-            }
-        });
+
 
         spinnerLanguage = root.findViewById(R.id.spinner_language);
         String[] languages = { getString(R.string.spanish), getString(R.string.english) };
@@ -99,27 +93,6 @@ public class SettingFragment extends Fragment {
         return root;
     }
 
-    private void cerrarSesion() {
-        googleSignInClient.signOut().addOnCompleteListener(requireActivity(), task -> {
-            if (task.isSuccessful()) {
-                Toast.makeText(getContext(), "Sesión cerrada de Google", Toast.LENGTH_SHORT).show();
-                if (auth != null) {
-                    auth.signOut();
-                    Toast.makeText(getContext(), "Sesión cerrada de Firebase", Toast.LENGTH_SHORT).show();
-                }
-                irAlLogin();
-            } else {
-                Toast.makeText(getContext(), "Error al cerrar sesión de Google.", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void irAlLogin() {
-        Intent intent = new Intent(getContext(), LoginActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        requireActivity().finish();
-    }
 
 
     private void setLocale(String langCode) {

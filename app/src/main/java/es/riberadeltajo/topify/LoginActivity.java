@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -78,7 +79,10 @@ public class LoginActivity extends AppCompatActivity {
                                             String nombre = user.getDisplayName();
                                             String email = user.getEmail();
                                             String fotoUrl = (user.getPhotoUrl() != null) ? user.getPhotoUrl().toString() : "";
-                                            FirestoreHelper.guardarUsuarioFirestore(userID,nombre,email,fotoUrl);
+
+                                            String nombreCodificado = encodeToBase64(nombre);
+                                            String emailCodificado = encodeToBase64(email);
+                                            FirestoreHelper.guardarUsuarioFirestore(userID,nombreCodificado,emailCodificado,fotoUrl);
 
                                             navegarMainActivity();
                                         }
@@ -165,6 +169,11 @@ public class LoginActivity extends AppCompatActivity {
 
 
     }
+
+    private String encodeToBase64(String input) {
+        return Base64.encodeToString(input.getBytes(), Base64.NO_WRAP);
+    }
+
 
     private void iniciarSesion(String email, String password) {
         auth.signInWithEmailAndPassword(email, password)
