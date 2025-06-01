@@ -6,17 +6,20 @@
     <string name="nav_header_subtitle">android.studio@android.com</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">Settings</string>
+    <string name="action_perfil">Perfil</string>
 
     <string name="menu_home">Top</string>
     <string name="menu_listas">Listas de Reproducción</string>
     <string name="menu_buscar">Buscar</string>
     <string name="menu_settings">Settings</string>
+    <string name="menu_perfil">Perfil</string>
     <string name="menu_usuario">Buscar usuarios</string>
     <string name="language">Idioma</string>
     <string name="spanish">Español</string>
     <string name="english">Inglés</string>
     <string name="dark_mode">Modo oscuro</string>
     <string name="client_id">105733984197-g19ggkq0favrid0lqft3jmclfggo1mni.apps.googleusercontent.com</string>
+    <string name="google_maps_key">AIzaSyDpVaZI93ICbidtqk9cv6AC0jsj1xeQm3s</string>
     <string-array name="search_types">
         <item>Todo</item>
         <item>Canción</item>

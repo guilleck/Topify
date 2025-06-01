@@ -3,6 +3,7 @@ package es.riberadeltajo.topify;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Menu;
@@ -36,16 +37,19 @@ import java.util.Locale;
 import es.riberadeltajo.topify.databinding.ActivityMainBinding;
 import es.riberadeltajo.topify.models.DarkModeHelper;
 import es.riberadeltajo.topify.models.ListaReproduccionViewModel;
+import es.riberadeltajo.topify.ui.slideshow.PerfilFragment; // Importar PerfilFragment para la interfaz
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements PerfilFragment.OnProfilePhotoChangeListener {
 
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
     private TextView textViewNombre, textViewEmail;
     private com.google.android.material.imageview.ShapeableImageView imageViewPhoto;
     private FirebaseAuth auth;
+    private FirebaseFirestore db;
     private GoogleSignInClient googleSignInClient;
     private Toolbar toolbar;
+    private Button logoutButton;
 
     @SuppressLint("WrongViewCast")
     @Override
@@ -56,17 +60,11 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        toolbar = binding.appBarMain.toolbar; // Inicializar Toolbar
+        toolbar = binding.appBarMain.toolbar;
         setSupportActionBar(toolbar);
 
-        ListaReproduccionViewModel viewModel = new ViewModelProvider(this).get(ListaReproduccionViewModel.class);
-
-
         auth = FirebaseAuth.getInstance();
-
-
-        FirebaseUser user = auth.getCurrentUser();
-
+        db = FirebaseFirestore.getInstance();
 
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
@@ -75,65 +73,25 @@ public class MainActivity extends AppCompatActivity {
         textViewNombre = headerView.findViewById(R.id.textViewNombre);
         textViewEmail = headerView.findViewById(R.id.textViewCorreo);
         imageViewPhoto = headerView.findViewById(R.id.imageViewFoto);
+        logoutButton = headerView.findViewById(R.id.buttonLogout);
 
+        loadUserDataInitial();
 
-
-        if (user != null) {
-            boolean esGoogle = false;
-            for (com.google.firebase.auth.UserInfo profile : user.getProviderData()) {
-                if (profile.getProviderId().equals("google.com")) {
-                    esGoogle = true;
-                    break;
-                }
+        logoutButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                cerrarSesion();
             }
+        });
 
-            if (esGoogle) {
-                textViewNombre.setText(user.getDisplayName());
-                textViewEmail.setText(user.getEmail());
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.default_web_client_id))
+                .requestEmail()
+                .build();
+        googleSignInClient = GoogleSignIn.getClient(this, gso);
 
-                if (user.getPhotoUrl() != null) {
-                    Glide.with(this)
-                            .load(user.getPhotoUrl())
-                            .into(imageViewPhoto);
-                } else {
-                    imageViewPhoto.setImageResource(R.drawable.usuario);
-                }
-            } else {
-                FirebaseFirestore db = FirebaseFirestore.getInstance();
-                db.collection("usuarios").document(user.getUid())
-                        .get()
-                        .addOnSuccessListener(document -> {
-                            if (document.exists()) {
-                                String nombre = document.getString("nombre");
-                                String email = document.getString("email");
-                                String fotoUrl = document.getString("foto");
-
-                                textViewNombre.setText(nombre != null ? nombre : "Usuario");
-                                textViewEmail.setText(email != null ? email : user.getEmail());
-
-                                if (fotoUrl != null && !fotoUrl.isEmpty()) {
-                                    Glide.with(this)
-                                            .load(fotoUrl)
-                                            .into(imageViewPhoto);
-                                } else {
-                                    imageViewPhoto.setImageResource(R.drawable.usuario);
-                                }
-                            } else {
-                                textViewNombre.setText("Usuario");
-                                textViewEmail.setText(user.getEmail());
-                                imageViewPhoto.setImageResource(R.drawable.usuario);
-                            }
-                        })
-                        .addOnFailureListener(e -> {
-                            textViewNombre.setText("Usuario");
-                            textViewEmail.setText(user.getEmail());
-                            imageViewPhoto.setImageResource(R.drawable.usuario);
-                        });
-            }
-        }
-
-
-
+        // Cargar datos iniciales del usuario
+        loadUserDataInitial();
 
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         mAppBarConfiguration = new AppBarConfiguration.Builder(
@@ -160,7 +118,102 @@ public class MainActivity extends AppCompatActivity {
         });
 
         updateToolbarTitleWithCountry();
+
+
     }
+
+    private void loadUserDataInitial() {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user != null) {
+            db.collection("usuarios").document(user.getUid())
+                    .get()
+                    .addOnSuccessListener(document -> {
+                        if (document.exists()) {
+                            String fotoUrl = document.getString("foto"); // Carga la URL de la foto de Firestore
+                            String nombre = document.getString("nombre"); // Carga el nombre
+                            String email = document.getString("email");   // Carga el email
+
+                            textViewNombre.setText(nombre != null ? nombre : "Usuario"); // Establece el nombre en el TextView
+                            textViewEmail.setText(email != null ? email : user.getEmail()); // Establece el email en el TextView
+
+                            if (fotoUrl != null && !fotoUrl.isEmpty()) {
+                                Glide.with(this)
+                                        .load(fotoUrl) // Glide cargará la URL (local o externa)
+                                        .placeholder(R.drawable.usuario)
+                                        .error(R.drawable.usuario)
+                                        .into(imageViewPhoto);
+                            } else {
+                                imageViewPhoto.setImageResource(R.drawable.usuario); // Imagen por defecto si no hay foto
+                            }
+
+                        } else {
+                            textViewNombre.setText("Usuario"); // Establece un nombre por defecto
+                            textViewEmail.setText(user.getEmail()); // Establece el email del usuario de Firebase
+                            imageViewPhoto.setImageResource(R.drawable.usuario); // Si el documento no existe
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e("MainActivity", "Error al cargar datos iniciales del usuario: " + e.getMessage());
+                        textViewNombre.setText("Usuario"); // Establece un nombre por defecto en caso de error
+                        textViewEmail.setText(user.getEmail()); // Establece el email del usuario de Firebase en caso de error
+                        imageViewPhoto.setImageResource(R.drawable.usuario); // Error, muestra por defecto
+                    });
+        } else {
+            textViewNombre.setText("Invitado"); // Establece "Invitado" si no hay usuario logueado
+            textViewEmail.setText(""); // Establece un email vacío si no hay usuario logueado
+            imageViewPhoto.setImageResource(R.drawable.usuario); // No hay usuario logeado
+        }
+    }
+
+    @Override
+    public void onProfilePhotoChanged(String newPhotoUrl) {
+        if (newPhotoUrl != null && !newPhotoUrl.isEmpty()) {
+            Glide.with(this)
+                    .load(newPhotoUrl)
+                    .placeholder(R.drawable.usuario)
+                    .error(R.drawable.usuario)
+                    .into(imageViewPhoto);
+        } else {
+            imageViewPhoto.setImageResource(R.drawable.usuario);
+        }
+    }
+
+    @Override
+    public void onProfilePhotoDeleted() {
+        imageViewPhoto.setImageResource(R.drawable.usuario);
+    }
+
+
+    private void cerrarSesion() {
+        if (googleSignInClient != null) {
+            googleSignInClient.signOut().addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    Toast.makeText(this, "Sesión cerrada de Google", Toast.LENGTH_SHORT).show();
+                    if (auth != null) {
+                        auth.signOut();
+                        Toast.makeText(this, "Sesión cerrada de Firebase", Toast.LENGTH_SHORT).show();
+                    }
+                    irAlLogin();
+                } else {
+                    Toast.makeText(this, "Error al cerrar sesión de Google.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            if (auth != null) {
+                auth.signOut();
+                Toast.makeText(this, "Sesión cerrada de Firebase", Toast.LENGTH_SHORT).show();
+            }
+            irAlLogin();
+        }
+    }
+
+    private void irAlLogin() {
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        this.finish();
+    }
+
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
@@ -169,6 +222,9 @@ public class MainActivity extends AppCompatActivity {
 
         if (id == R.id.action_settings) {
             navController.navigate(R.id.nav_setting);
+            return true;
+        }else if(id == R.id.action_perfil){
+            navController.navigate(R.id.nav_perfil);
             return true;
         }
 
@@ -179,7 +235,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         return true;
     }

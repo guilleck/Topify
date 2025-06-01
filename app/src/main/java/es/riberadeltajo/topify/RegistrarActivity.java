@@ -26,6 +26,7 @@ import java.util.Locale;
 
 import es.riberadeltajo.topify.database.DatabaseHelper;
 import es.riberadeltajo.topify.database.FirestoreHelper;
+import android.util.Base64;
 
 public class RegistrarActivity extends AppCompatActivity {
     private FirebaseAuth auth;
@@ -78,7 +79,10 @@ public class RegistrarActivity extends AppCompatActivity {
                             String emailUser = usuario.getEmail();
                             String foto = "";
 
-                            FirestoreHelper.guardarUsuarioFirestore(uid,nombre,emailUser,foto);
+                            String nombreCodificado = encodeToBase64(nombre);
+                            String correoCodificado = encodeToBase64(emailUser);
+
+                            FirestoreHelper.guardarUsuarioFirestore(uid,nombreCodificado,correoCodificado,foto);
 
                             navegarLoginActivity();
                         }
@@ -114,7 +118,9 @@ public class RegistrarActivity extends AppCompatActivity {
                 });
     }
 
-
+    private String encodeToBase64(String input) {
+        return Base64.encodeToString(input.getBytes(), Base64.NO_WRAP);
+    }
 
     private void navegarLoginActivity() {
         Intent intent = new Intent(RegistrarActivity.this, LoginActivity.class);
