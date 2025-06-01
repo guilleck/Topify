@@ -30,6 +30,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.google.firebase.auth.FirebaseAuth;
@@ -47,11 +49,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+// Importaciones necesarias para Base64
+import android.util.Base64;
+import java.io.UnsupportedEncodingException;
+
+
 // NOTA: Ya no necesitamos importar FirebaseStorage ni StorageReference
 // import com.google.firebase.storage.FirebaseStorage;
 // import com.google.firebase.storage.StorageReference;
 
 import es.riberadeltajo.topify.R;
+import es.riberadeltajo.topify.adapter.UserAdapter;
+import es.riberadeltajo.topify.models.User;
 
 public class PerfilFragment extends Fragment {
 
@@ -84,6 +93,10 @@ public class PerfilFragment extends Fragment {
     private FirebaseAuth auth;
     private FirebaseFirestore db;
 
+    private RecyclerView rvFriends;
+    private UserAdapter friendAdapter;
+    private List<User> friendList = new ArrayList<>();
+
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
@@ -109,9 +122,8 @@ public class PerfilFragment extends Fragment {
         // Inicializar Firebase (Solo Auth y Firestore)
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
-        // NOTA: Ya no inicializamos FirebaseStorage
-        // storage = FirebaseStorage.getInstance();
-        // storageRef = storage.getReference();
+
+
 
         // Launcher para solicitar permisos de la cámara y almacenamiento
         requestPermissionLauncher = registerForActivityResult(
@@ -179,6 +191,23 @@ public class PerfilFragment extends Fragment {
         );
     }
 
+    // Método para decodificar una cadena Base64
+    private String decodeBase64(String encodedString) {
+        if (encodedString == null || encodedString.isEmpty()) {
+            return "";
+        }
+        try {
+            byte[] decodedBytes = Base64.decode(encodedString, Base64.DEFAULT);
+            return new String(decodedBytes, "UTF-8");
+        } catch (IllegalArgumentException e) {
+            Log.e("Base64Decoder", "Error decodificando Base64: " + e.getMessage() + " para la cadena: " + encodedString);
+            return encodedString; // Devuelve la cadena original si hay un error de formato Base64
+        } catch (UnsupportedEncodingException e) {
+            Log.e("Base64Decoder", "Error de codificación de caracteres: " + e.getMessage());
+            return encodedString; // Devuelve la cadena original si hay un error de codificación
+        }
+    }
+
     // 5. onCreateView para inflar el layout e inicializar vistas
     @Nullable
     @Override
@@ -193,7 +222,19 @@ public class PerfilFragment extends Fragment {
         textViewUserEmail = root.findViewById(R.id.textViewUserEmail);
         buttonEditProfile = root.findViewById(R.id.buttonEditProfile);
 
+        rvFriends = root.findViewById(R.id.rvFriends); // Asegúrate que este ID exista en fragment_perfil.xml
+        // Cuando haces clic en un amigo, quieres ir a su UserProfileFragment
+        friendAdapter = new UserAdapter(friendList, friend -> {
+            // Navegar a UserProfileFragment pasando el ID del amigo
+            Bundle bundle = new Bundle();
+            bundle.putString("userId", friend.getId());
+            Navigation.findNavController(root).navigate(R.id.userProfileFragment, bundle);
+        });
+        rvFriends.setLayoutManager(new LinearLayoutManager(getContext()));
+        rvFriends.setAdapter(friendAdapter);
+
         loadUserProfileData();
+        loadFriends();
 
         textViewChangeDeletePhoto.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -212,7 +253,50 @@ public class PerfilFragment extends Fragment {
         return root;
     }
 
-    // 6. Carga de datos del usuario desde Firestore (sin cambios)
+    private void loadFriends() {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user != null) {
+            db.collection("usuarios").document(user.getUid())
+                    .get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        // Obtener la lista de IDs de amigos del usuario actual
+                        List<String> friendIds = (List<String>) documentSnapshot.get("friends");
+                        friendList.clear(); // Limpiar la lista antes de añadir nuevos amigos
+
+                        if (friendIds != null && !friendIds.isEmpty()) {
+                            // Para cada ID de amigo, obtener sus datos completos
+                            for (String friendId : friendIds) {
+                                db.collection("usuarios").document(friendId)
+                                        .get()
+                                        .addOnSuccessListener(friendDoc -> {
+                                            if (friendDoc.exists()) {
+                                                String encodedNombre = friendDoc.getString("nombre"); // Obtener nombre codificado
+                                                String encodedEmail = friendDoc.getString("email");   // Obtener email codificado
+                                                String foto = friendDoc.getString("foto");
+
+                                                // Decodificar el nombre y el email del amigo
+                                                String nombreDecodificado = decodeBase64(encodedNombre);
+                                                String emailDecodificado = decodeBase64(encodedEmail);
+
+                                                User friend = new User(friendDoc.getId(), nombreDecodificado, emailDecodificado, foto);
+                                                friendList.add(friend);
+                                                friendAdapter.notifyDataSetChanged(); // Notificar al adaptador cada vez que se añade un amigo
+                                            }
+                                        })
+                                        .addOnFailureListener(e -> Log.e("PerfilFragment", "Error cargando datos de amigo: " + e.getMessage()));
+                            }
+                        } else {
+                            // Opcional: Mostrar un mensaje si no hay amigos (puedes descomentar la línea de Toast)
+                            // Toast.makeText(getContext(), "Aún no tienes amigos.", Toast.LENGTH_SHORT).show();
+                            Log.d("PerfilFragment", "El usuario no tiene amigos.");
+                        }
+                        // La notificación final fuera del bucle ya no es tan crítica si se notifica dentro
+                        // friendAdapter.notifyDataSetChanged();
+                    })
+                    .addOnFailureListener(e -> Log.e("PerfilFragment", "Error al cargar la lista de amigos: " + e.getMessage()));
+        }
+    }
+
     private void loadUserProfileData() {
         FirebaseUser user = auth.getCurrentUser();
         if (user != null) {
@@ -220,12 +304,16 @@ public class PerfilFragment extends Fragment {
                     .get()
                     .addOnSuccessListener(document -> {
                         if (document.exists()) {
-                            String nombre = document.getString("nombre");
-                            String email = document.getString("email");
+                            String encodedNombre = document.getString("nombre"); // Cargar nombre codificado
+                            String encodedEmail = document.getString("email");   // Cargar email codificado
                             String fotoUrl = document.getString("foto");
 
-                            textViewUserName.setText(nombre != null ? nombre : "Usuario");
-                            textViewUserEmail.setText(email != null ? email : user.getEmail());
+                            // Decodificar el nombre y el email
+                            String nombreDecodificado = decodeBase64(encodedNombre);
+                            String emailDecodificado = decodeBase64(encodedEmail);
+
+                            textViewUserName.setText(nombreDecodificado != null ? nombreDecodificado : "Usuario");
+                            textViewUserEmail.setText(emailDecodificado != null ? emailDecodificado : user.getEmail());
 
                             if (fotoUrl != null && !fotoUrl.isEmpty()) {
                                 tempProfilePhotoUrl = fotoUrl;

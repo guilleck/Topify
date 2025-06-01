@@ -20,6 +20,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -32,6 +33,20 @@ public class RegistrarActivity extends AppCompatActivity {
     private FirebaseAuth auth;
     private EditText editTextNombre, editTextCorreo, editTextPass;
     private Button buttonRegistrar;
+
+    private final List<String> DOMINIOS_VALIDOS = Arrays.asList(
+            "@gmail.com",
+            "@hotmail.com",
+            "@outlook.com",
+            "@yahoo.com",
+            "@live.com",
+            "@aol.com",
+            "@icloud.com",
+            "@protonmail.com",
+            "@mail.com",
+            "@gmx.com",
+            "@yandex.com"
+    );
     @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,8 +80,21 @@ public class RegistrarActivity extends AppCompatActivity {
             return;
         }
 
-        if (password.length() < 6) {
-            Toast.makeText(RegistrarActivity.this,"La constraseña debe tener mas de 6 digitos",Toast.LENGTH_SHORT).show();
+        if(password.length() < 6){
+            Toast.makeText(RegistrarActivity.this,"La longitud de la contraseña debe ser de más de 6",Toast.LENGTH_SHORT).show();
+        }
+
+
+        boolean dominioEncontrado = false;
+        for (String dominio : DOMINIOS_VALIDOS) {
+            if (email.toLowerCase().endsWith(dominio.toLowerCase())) {
+                dominioEncontrado = true;
+                break; // Se encontró un dominio válido, salir del bucle
+            }
+        }
+
+        if (!dominioEncontrado) {
+            Toast.makeText(RegistrarActivity.this, "Por favor, introduce un correo con un dominio válido", Toast.LENGTH_LONG).show();
             return;
         }
 

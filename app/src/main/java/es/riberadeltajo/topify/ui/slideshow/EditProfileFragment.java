@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -33,6 +34,9 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import es.riberadeltajo.topify.LocationActivity; // Asegúrate de que esta clase exista en este paquete
 import es.riberadeltajo.topify.R;
 
@@ -47,7 +51,7 @@ public class EditProfileFragment extends Fragment {
     private Button buttonSaveProfile;
     private CountryCodePicker countryCodePicker;
 
-    private FirebaseAuth mAuth;
+    private FirebaseAuth auth;
     private FirebaseFirestore db;
 
     private ActivityResultLauncher<Intent> locationLauncher;
@@ -58,7 +62,7 @@ public class EditProfileFragment extends Fragment {
         if (FirebaseApp.getApps(requireContext()).isEmpty()) {
             FirebaseApp.initializeApp(requireContext());
         }
-        mAuth = FirebaseAuth.getInstance();
+        auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
     }
 
@@ -115,7 +119,7 @@ public class EditProfileFragment extends Fragment {
         buttonSaveProfile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                saveProfileData();
+                saveProfileChanges();
             }
         });
 
@@ -139,7 +143,7 @@ public class EditProfileFragment extends Fragment {
         editTextAddress.setText(savedAddress);
 
         // Cargar nombre desde Firebase
-        FirebaseUser currentUser = mAuth.getCurrentUser();
+        FirebaseUser currentUser = auth.getCurrentUser();
         if (currentUser != null) {
             String uid = currentUser.getUid();
             db.collection("usuarios").document(uid)
@@ -173,52 +177,34 @@ public class EditProfileFragment extends Fragment {
         }
     }
 
-    private void saveProfileData() {
-        String newName = editTextName.getText().toString().trim();
-        String newAddress = editTextAddress.getText().toString().trim();
+    private void saveProfileChanges() {
+        String newUserName = editTextName.getText().toString().trim();
+        String newPhoneNumber = editTextPhone.getText().toString().trim(); // Asumiendo que tienes un EditText para el teléfono
+        String newLocation = editTextAddress.getText().toString().trim(); // Asumiendo que tienes un EditText para la ubicación
 
-        if (newName.isEmpty()) {
-            Toast.makeText(getContext(), "El nombre no puede estar vacío", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (newAddress.isEmpty()) {
-            Toast.makeText(getContext(), "La ubicación no puede estar vacía", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        FirebaseUser user = auth.getCurrentUser();
+        if (user != null) {
+            // Codificar los datos a Base64
+            String encodedUserName = Base64.encodeToString(newUserName.getBytes(), Base64.DEFAULT);
+            String encodedPhoneNumber = Base64.encodeToString(newPhoneNumber.getBytes(), Base64.DEFAULT);
+            String encodedLocation = Base64.encodeToString(newLocation.getBytes(), Base64.DEFAULT);
 
-        String fullPhoneNumber = countryCodePicker.getFullNumberWithPlus();
-        String countryRegionCode = countryCodePicker.getSelectedCountryNameCode();
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("nombre", encodedUserName);
+            updates.put("telefono", encodedPhoneNumber); // Asegúrate de que tu modelo de usuario en Firestore tenga un campo 'telefono'
+            updates.put("ubicacion", encodedLocation);   // Asegúrate de que tu modelo de usuario en Firestore tenga un campo 'ubicacion'
 
-        if (TextUtils.isEmpty(countryRegionCode)) {
-            Toast.makeText(getContext(), "Por favor, seleccione un código de país.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        if (!countryCodePicker.isValidFullNumber()) {
-            Toast.makeText(getContext(), "Número de teléfono no válido para la región seleccionada", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        String newPhone = editTextPhone.getText().toString().trim();
-
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
-            String uid = currentUser.getUid();
-            db.collection("usuarios").document(uid)
-                    .update("nombre", newName, "telefono", fullPhoneNumber, "ubicacion", newAddress)
+            db.collection("usuarios").document(user.getUid())
+                    .update(updates)
                     .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "Datos de usuario actualizados en Firestore.");
-                        saveDataToSharedPreferences(newName, newPhone, newAddress, fullPhoneNumber);
-                        Toast.makeText(getContext(), "Perfil guardado con Firebase.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "Perfil actualizado con éxito.", Toast.LENGTH_SHORT).show();
+                        // Puedes navegar de vuelta al PerfilFragment aquí
+                        Navigation.findNavController(requireView()).popBackStack(); // Vuelve al fragmento anterior
                     })
                     .addOnFailureListener(e -> {
-                        Log.w(TAG, "Error al actualizar datos en Firestore", e);
-                        Toast.makeText(getContext(), "Error al guardar el perfil en Firebase.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "Error al actualizar perfil: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Log.e("EditProfileFragment", "Error al actualizar perfil", e);
                     });
-        } else {
-            Log.d(TAG, "Usuario no autenticado, guardando solo en SharedPreferences.");
-            saveDataToSharedPreferences(newName, newPhone, newAddress, fullPhoneNumber);
-            Toast.makeText(getContext(), "Perfil guardado (solo localmente).", Toast.LENGTH_SHORT).show();
         }
     }
 

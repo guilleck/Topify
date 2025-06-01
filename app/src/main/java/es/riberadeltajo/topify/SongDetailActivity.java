@@ -70,6 +70,7 @@ public class SongDetailActivity extends AppCompatActivity {
     private RecyclerView recyclerViewComments;
     private CommentAdapter commentAdapter;
     private List<Comment> commentsList;
+    private ImageView buttonReloadComments; // Declaración del nuevo botón
 
     private MediaPlayer mediaPlayer;
     private boolean isPlaying = false;
@@ -119,6 +120,7 @@ public class SongDetailActivity extends AppCompatActivity {
         editTextComment = findViewById(R.id.editTextComment);
         buttonPostComment = findViewById(R.id.buttonPostComment);
         recyclerViewComments = findViewById(R.id.recyclerViewComments);
+        buttonReloadComments = findViewById(R.id.buttonReloadComments); // Inicialización del botón
 
         commentsList = new ArrayList<>();
         commentAdapter = new CommentAdapter(commentsList, isDarkMode);
@@ -170,6 +172,23 @@ public class SongDetailActivity extends AppCompatActivity {
             });
 
             buttonPostComment.setOnClickListener(v -> postComment());
+            // Asignar OnClickListener al nuevo botón de recarga
+            buttonReloadComments.setOnClickListener(v -> {
+                if (currentSong != null) {
+                    // Si ya hay un listener, lo removemos antes de añadir uno nuevo
+                    if (commentsListenerRegistration != null) {
+                        commentsListenerRegistration.remove();
+                        Log.d("SongDetailDebug", "onCreate: Listener de comentarios existente desregistrado antes de recargar.");
+                    }
+                    loadComments(currentSong.deezer_id);
+                    Toast.makeText(this, "Comentarios recargados", Toast.LENGTH_SHORT).show();
+                    Log.d("SongDetailDebug", "onCreate: Recargando comentarios por petición del usuario.");
+                } else {
+                    Toast.makeText(this, "No se puede recargar, información de la canción no disponible.", Toast.LENGTH_SHORT).show();
+                    Log.w("SongDetailDebug", "onCreate: currentSong es null, no se pueden recargar comentarios.");
+                }
+            });
+
 
             seekBarProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
@@ -209,6 +228,8 @@ public class SongDetailActivity extends AppCompatActivity {
                 applyDarkModeStyleToButton(buttonPlayPreview);
                 applyDarkModeStyleToButton(buttonAddToPlaylist);
                 applyDarkModeStyleToEditText(editTextComment);
+                // Si quieres aplicar un estilo al ImageButton para Dark Mode, hazlo aquí
+                // Por ejemplo, buttonReloadComments.setColorFilter(Color.WHITE);
             }
         }
     }
@@ -409,6 +430,12 @@ public class SongDetailActivity extends AppCompatActivity {
     private void loadComments(long songDeezerId) {
         Log.d("SongDetailDebug", "loadComments: Configurando listener para Song Deezer ID: " + songDeezerId);
 
+        // Desregistrar el listener anterior si existe para evitar duplicados
+        if (commentsListenerRegistration != null) {
+            commentsListenerRegistration.remove();
+            Log.d("SongDetailDebug", "loadComments: Listener de comentarios existente desregistrado antes de cargar nuevos.");
+        }
+
         CollectionReference commentsRef = db.collection("comments");
 
         Query query = commentsRef
@@ -420,6 +447,11 @@ public class SongDetailActivity extends AppCompatActivity {
             public void onEvent(@Nullable QuerySnapshot snapshots,
                                 @Nullable FirebaseFirestoreException e) {
 
+                if (e != null) {
+                    Log.w("SongDetailDebug", "loadComments: Escucha de comentarios falló.", e);
+                    Toast.makeText(SongDetailActivity.this, "Error al cargar comentarios.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 if (snapshots != null) {
                     List<Comment> updatedComments = new ArrayList<>();
@@ -444,7 +476,7 @@ public class SongDetailActivity extends AppCompatActivity {
                     }
 
                     commentAdapter.setComments(updatedComments);
-                    if (commentsList.size() > 0) { // Si hay comentarios, intentar desplazar
+                    if (commentsList.size() > 0) {
                         recyclerViewComments.scrollToPosition(commentsList.size() - 1);
                     }
                 } else {
