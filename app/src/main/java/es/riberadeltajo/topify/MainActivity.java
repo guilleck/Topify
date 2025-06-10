@@ -3,6 +3,7 @@ package es.riberadeltajo.topify;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
@@ -32,6 +33,7 @@ import androidx.navigation.ui.NavigationUI;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.UnsupportedEncodingException;
 import java.util.Locale;
 
 import es.riberadeltajo.topify.databinding.ActivityMainBinding;
@@ -122,6 +124,22 @@ public class MainActivity extends AppCompatActivity implements PerfilFragment.On
 
     }
 
+    private String decodeBase64(String encodedString) {
+        if (encodedString == null || encodedString.isEmpty()) {
+            return "";
+        }
+        try {
+            byte[] decodedBytes = Base64.decode(encodedString, Base64.DEFAULT);
+            return new String(decodedBytes, "UTF-8");
+        } catch (IllegalArgumentException e) {
+            Log.e("Base64", "Error decodificando Base64: " + e.getMessage());
+            return encodedString; // Devuelve la cadena original si hay un error de formato Base64
+        } catch (UnsupportedEncodingException e) {
+            Log.e("Base64", "Error de codificación de caracteres: " + e.getMessage());
+            return encodedString; // Devuelve la cadena original si hay un error de codificación
+        }
+    }
+
     private void loadUserDataInitial() {
         FirebaseUser user = auth.getCurrentUser();
         if (user != null) {
@@ -130,11 +148,15 @@ public class MainActivity extends AppCompatActivity implements PerfilFragment.On
                     .addOnSuccessListener(document -> {
                         if (document.exists()) {
                             String fotoUrl = document.getString("foto"); // Carga la URL de la foto de Firestore
-                            String nombre = document.getString("nombre"); // Carga el nombre
-                            String email = document.getString("email");   // Carga el email
+                            String encodedNombre = document.getString("nombre"); // Carga el nombre codificado
+                            String encodedEmail = document.getString("email");   // Carga el email codificado
 
-                            textViewNombre.setText(nombre != null ? nombre : "Usuario"); // Establece el nombre en el TextView
-                            textViewEmail.setText(email != null ? email : user.getEmail()); // Establece el email en el TextView
+                            // Decodificar el nombre y el email
+                            String nombreDecodificado = decodeBase64(encodedNombre);
+                            String emailDecodificado = decodeBase64(encodedEmail);
+
+                            textViewNombre.setText(nombreDecodificado != null && !nombreDecodificado.isEmpty() ? nombreDecodificado : "Usuario"); // Establece el nombre decodificado
+                            textViewEmail.setText(emailDecodificado != null && !emailDecodificado.isEmpty() ? emailDecodificado : user.getEmail()); // Establece el email decodificado
 
                             if (fotoUrl != null && !fotoUrl.isEmpty()) {
                                 Glide.with(this)

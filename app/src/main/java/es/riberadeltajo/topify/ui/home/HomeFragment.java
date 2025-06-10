@@ -86,6 +86,9 @@ public class HomeFragment extends Fragment implements SongAdapter.OnItemClickLis
                     int limit = Math.min(allTracks.size(), 10);
                     List<DeezerTrackResponse.Track> topTracks = allTracks.subList(0, limit);
                     Log.d("API_RESPONSE", "Number of top tracks received: " + topTracks.size());
+                    for (DeezerTrackResponse.Track track : topTracks) {
+                        Log.d("DeezerDebug", "Canción: " + track.title + " | Deezer ID: " + track.deezer_id);
+                    }
                     adapter.updateSongs(topTracks);
                 } else {
                     Log.e("API_RESPONSE", "Error getting top tracks: " + response.message());

@@ -8,7 +8,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.widget.Button; // Importar Button
 import android.widget.CompoundButton;
 import android.widget.Spinner;
 import android.widget.ArrayAdapter;
@@ -23,7 +23,10 @@ import androidx.fragment.app.Fragment;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser; // Importar FirebaseUser
 
 import java.util.Locale;
 
@@ -39,7 +42,8 @@ public class SettingFragment extends Fragment {
     private static final String KEY_LANGUAGE = "language";
 
     private Switch switchDarkMode;
-    private Spinner spinnerLanguage;
+    private Spinner spinnerLanguage; // Aunque no lo usas, lo mantengo por si es parte de tu plan futuro.
+    private Button btnDeleteAccount; // Declarar el botón
 
     private GoogleSignInClient googleSignInClient;
     private FirebaseAuth auth;
@@ -63,37 +67,52 @@ public class SettingFragment extends Fragment {
             requireActivity().recreate();
         });
 
+        // Inicializar el botón de eliminar cuenta
+        btnDeleteAccount = root.findViewById(R.id.btn_delete_account);
 
-
-        spinnerLanguage = root.findViewById(R.id.spinner_language);
-        String[] languages = { getString(R.string.spanish), getString(R.string.english) };
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, languages);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerLanguage.setAdapter(adapter);
-
-        // Idioma guardado
-        String savedLang = preferences.getString(KEY_LANGUAGE, "es");
-        spinnerLanguage.setSelection(savedLang.equals("es") ? 0 : 1);
-
-        spinnerLanguage.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                String selectedLang = (position == 0) ? "es" : "en";
-                if (!selectedLang.equals(savedLang)) {
-                    preferences.edit().putString(KEY_LANGUAGE, selectedLang).apply();
-                    setLocale(selectedLang);
-                    requireActivity().recreate(); // Recarga interfaz
-                }
-            }
-
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        // Configurar el OnClickListener para el botón de eliminar cuenta
+        btnDeleteAccount.setOnClickListener(v -> {
+            deleteUserAccount();
         });
 
         return root;
     }
 
+    private void deleteUserAccount() {
+        FirebaseUser user = auth.getCurrentUser();
 
+        if (user != null) {
+            user.delete()
+                    .addOnCompleteListener(new OnCompleteListener<Void>() {
+                        @Override
+                        public void onComplete(@NonNull Task<Void> task) {
+                            if (task.isSuccessful()) {
+                                Toast.makeText(requireContext(), "Cuenta eliminada exitosamente.", Toast.LENGTH_SHORT).show();
+                                // Cerrar sesión de Google si está autenticado con Google
+                                googleSignInClient.signOut();
+                                // Redirigir al usuario a la pantalla de inicio de sesión
+                                Intent intent = new Intent(requireActivity(), LoginActivity.class);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                                requireActivity().finish(); // Cierra la actividad actual
+                            } else {
+                                // Si la eliminación falla, podría ser necesario volver a autenticar al usuario.
+                                // Esto sucede si la sesión del usuario ha caducado.
+                                Toast.makeText(requireContext(), "Error al eliminar la cuenta. Por favor, inicia sesión de nuevo.", Toast.LENGTH_LONG).show();
+                                // Puedes forzar al usuario a iniciar sesión de nuevo aquí si quieres
+                                auth.signOut();
+                                googleSignInClient.signOut();
+                                Intent intent = new Intent(requireActivity(), LoginActivity.class);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                                requireActivity().finish();
+                            }
+                        }
+                    });
+        } else {
+            Toast.makeText(requireContext(), "No hay usuario autenticado para eliminar.", Toast.LENGTH_SHORT).show();
+        }
+    }
 
     private void setLocale(String langCode) {
         Locale locale = new Locale(langCode);

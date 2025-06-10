@@ -52,8 +52,22 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Editar Perfil"
-        android:layout_marginTop="32dp"
-        android:paddingLeft="32dp"
-        android:paddingRight="32dp"/>
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:id="@+id/tvFriendsTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Mis Amigos:"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginTop="24dp"
+        android:gravity="center"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvFriends"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"/>
 
 </LinearLayout>

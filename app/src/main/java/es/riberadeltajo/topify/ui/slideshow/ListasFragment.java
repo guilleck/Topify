@@ -27,6 +27,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -57,24 +58,38 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
     private FloatingActionButton fabNuevaLista;
     private ListaReproduccionViewModel viewModel;
 
-    private String currentPhotoPath;
-    private Uri currentPhotoUri;
+    private String currentPhotoPath; // Para almacenar la ruta de la foto tomada con la cámara
+    private Uri currentPhotoUri;    // Para almacenar la URI de la foto tomada con la cámara
 
+    // ActivityResultLauncher para permisos
     private ActivityResultLauncher<String[]> requestPermissionLauncher;
+
+    // ActivityResultLauncher para tomar foto con cámara
     private ActivityResultLauncher<Uri> takePictureLauncher;
+
+    // ActivityResultLauncher para seleccionar de galería
     private ActivityResultLauncher<String> pickImageLauncher;
 
+    // Variables para el diálogo de edición/creación
     private String tempPlaylistName;
     private String tempPlaylistPhotoUrl;
-    private boolean isEditing = false;
+    private boolean isEditing = false; // Indica si estamos en modo edición o creación
 
-    private AlertDialog currentEditOrCreateDialog;
-    private EditText inputFotoUrlInDialog;
+    private AlertDialog currentAlertDialog; // Añadir esta línea para gestionar los diálogos
+
+    // Método para cerrar el diálogo actual
+    private void dismissCurrentDialog() {
+        if (currentAlertDialog != null && currentAlertDialog.isShowing()) {
+            currentAlertDialog.dismiss();
+            currentAlertDialog = null;
+        }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Inicializar ActivityResultLauncher para permisos
         requestPermissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(), result -> {
                     Boolean cameraGranted = result.getOrDefault(Manifest.permission.CAMERA, false);
@@ -84,58 +99,76 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
                     );
 
                     if (cameraGranted != null && cameraGranted && storageGranted != null && storageGranted) {
-                        if (currentEditOrCreateDialog != null && !currentEditOrCreateDialog.isShowing()) {
-                            currentEditOrCreateDialog.show();
-                        }
-                        // Luego lanzamos el selector de origen de foto si es necesario
+                        // Permisos concedidos, proceder con la acción deseada (ej. abrir selector de origen de foto)
                         if (isEditing) {
+                            // Si estamos editando y los permisos se conceden,
+                            // volvemos a mostrar el diálogo de selección de origen
                             mostrarDialogoSeleccionarFotoOrigen(tempPlaylistName, tempPlaylistPhotoUrl, true);
                         } else {
-                            mostrarDialogoSeleccionarFotoOrigen(tempPlaylistName, tempPlaylistPhotoUrl, false);
+                            mostrarDialogoSeleccionarFotoOrigen(tempPlaylistName, "", false);
                         }
                     } else {
                         Toast.makeText(getContext(), "Permisos de cámara y almacenamiento son necesarios para esta función.", Toast.LENGTH_LONG).show();
+                        // Si los permisos no se conceden, no se debería volver a abrir el diálogo de edición/creación
+                        // Simplemente informar al usuario y esperar a que intente de nuevo.
+                        // Limpiar el estado si no se pueden obtener los permisos para evitar un bucle
+                        tempPlaylistName = null;
+                        tempPlaylistPhotoUrl = null;
+                        isEditing = false;
                     }
                 }
         );
 
+        // Inicializar ActivityResultLauncher para tomar foto
         takePictureLauncher = registerForActivityResult(
                 new ActivityResultContracts.TakePicture(), success -> {
-                    if (success) {
-                        if (currentPhotoUri != null) {
-                            tempPlaylistPhotoUrl = currentPhotoUri.toString();
-                            updatePhotoUrlInDialog(tempPlaylistPhotoUrl);
+                    dismissCurrentDialog(); // Cerrar cualquier diálogo existente antes de mostrar el nuevo
+                    if (success && currentPhotoUri != null) {
+                        // La foto se ha tomado correctamente, ahora podemos mostrar el diálogo con la URI
+                        if (isEditing) {
+                            mostrarDialogoEditarLista(tempPlaylistName, currentPhotoUri.toString());
                         } else {
-                            Toast.makeText(getContext(), "Error al obtener la URI de la foto.", Toast.LENGTH_SHORT).show();
-                            tempPlaylistPhotoUrl = "";
-                            updatePhotoUrlInDialog(tempPlaylistPhotoUrl);
+                            mostrarDialogoNuevaListaConFoto(tempPlaylistName, currentPhotoUri.toString());
                         }
                     } else {
-                        Toast.makeText(getContext(), "Foto no tomada o cancelada.", Toast.LENGTH_SHORT).show();
-                    }
-                    if (currentEditOrCreateDialog != null && !currentEditOrCreateDialog.isShowing()) {
-                        currentEditOrCreateDialog.show();
+                        Toast.makeText(getContext(), "Foto no tomada o error al obtener URI.", Toast.LENGTH_SHORT).show();
+                        // Si la foto no se tomó o hubo un error, no vuelvas a abrir el diálogo.
+                        // Limpiar el estado para evitar un bucle
+                        tempPlaylistName = null;
+                        tempPlaylistPhotoUrl = null;
+                        isEditing = false;
                     }
                 }
         );
 
+        // Inicializar ActivityResultLauncher para seleccionar de galería
         pickImageLauncher = registerForActivityResult(
                 new ActivityResultContracts.GetContent(), uri -> {
+                    dismissCurrentDialog(); // Cerrar cualquier diálogo existente antes de mostrar el nuevo
                     if (uri != null) {
                         String photoUriString = saveImageToInternalStorageAndGetUri(uri);
                         if (photoUriString != null) {
-                            tempPlaylistPhotoUrl = photoUriString;
-                            updatePhotoUrlInDialog(tempPlaylistPhotoUrl);
+                            // Imagen seleccionada de la galería y procesada correctamente
+                            if (isEditing) {
+                                mostrarDialogoEditarLista(tempPlaylistName, photoUriString);
+                            } else {
+                                mostrarDialogoNuevaListaConFoto(tempPlaylistName, photoUriString);
+                            }
                         } else {
                             Toast.makeText(getContext(), "Error al procesar la imagen de la galería.", Toast.LENGTH_SHORT).show();
-                            tempPlaylistPhotoUrl = "";
-                            updatePhotoUrlInDialog(tempPlaylistPhotoUrl);
+                            // Si hay un error al procesar, no vuelvas a abrir el diálogo.
+                            // Limpiar el estado para evitar un bucle
+                            tempPlaylistName = null;
+                            tempPlaylistPhotoUrl = null;
+                            isEditing = false;
                         }
                     } else {
                         Toast.makeText(getContext(), "Selección de imagen cancelada.", Toast.LENGTH_SHORT).show();
-                    }
-                    if (currentEditOrCreateDialog != null && !currentEditOrCreateDialog.isShowing()) {
-                        currentEditOrCreateDialog.show();
+                        // Si la selección se cancela, no vuelvas a abrir el diálogo.
+                        // Limpiar el estado para evitar un bucle
+                        tempPlaylistName = null;
+                        tempPlaylistPhotoUrl = null;
+                        isEditing = false;
                     }
                 }
         );
@@ -153,10 +186,12 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
 
         viewModel = new ViewModelProvider(requireActivity()).get(ListaReproduccionViewModel.class);
 
+        // Observar nombres de lista y fotos
         viewModel.getListaNombres().observe(getViewLifecycleOwner(), nombres -> {
+            // Se necesita el mapa de fotos para el adaptador
             Map<String, String> fotosMap = viewModel.getListaFotos().getValue();
             if (fotosMap == null) {
-                fotosMap = new HashMap<>();
+                fotosMap = new HashMap<>(); // Asegurarse de que no sea null
             }
             adapter = new ListaReproduccionAdapter(nombres, fotosMap, this, this);
             recyclerViewListas.setAdapter(adapter);
@@ -170,7 +205,8 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
 
         fabNuevaLista.setOnClickListener(v -> {
             isEditing = false;
-            tempPlaylistPhotoUrl = "";
+            tempPlaylistName = null; // Limpiar el estado temporal para una nueva creación
+            tempPlaylistPhotoUrl = null;
             mostrarDialogoPedirNombreLista();
         });
 
@@ -178,6 +214,7 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
     }
 
     private void mostrarDialogoPedirNombreLista() {
+        dismissCurrentDialog(); // Cerrar cualquier diálogo existente
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Crear nueva lista");
 
@@ -187,58 +224,77 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         inputNombre.setLayoutParams(lp);
-        inputNombre.setPadding(50, 20, 50, 20);
+        inputNombre.setPadding(50, 20, 50, 20); // Añadir padding
         builder.setView(inputNombre);
 
         builder.setPositiveButton("Siguiente", (dialog, which) -> {
             String nombreLista = inputNombre.getText().toString().trim();
             if (!nombreLista.isEmpty()) {
                 tempPlaylistName = nombreLista;
-                mostrarDialogoNuevaListaConFoto(tempPlaylistName, tempPlaylistPhotoUrl);
+                // tempPlaylistPhotoUrl se mantiene vacío ya que es una nueva lista
+                verificarYPedirPermisosParaFoto(false); // Es para crear nueva lista
             } else {
                 Toast.makeText(getContext(), "El nombre de la lista no puede estar vacío", Toast.LENGTH_SHORT).show();
             }
         });
-        builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.cancel());
+        builder.setNegativeButton("Cancelar", (dialog, which) -> {
+            dialog.cancel();
+            // Limpiar variables temporales al cancelar la creación
+            tempPlaylistName = null;
+            tempPlaylistPhotoUrl = null;
+            isEditing = false;
+        });
 
-        builder.show();
+        currentAlertDialog = builder.show(); // Asignar el diálogo actual
     }
 
+
     private void mostrarDialogoSeleccionarFotoOrigen(String nombreLista, String fotoUrlActual, boolean isEditingMode) {
+        dismissCurrentDialog(); // Cerrar cualquier diálogo existente
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Seleccionar foto para '" + nombreLista + "'");
         String[] opciones = {"Tomar foto", "Seleccionar de galería", "Introducir URL de foto", "Sin foto"};
 
         builder.setItems(opciones, (dialog, which) -> {
             switch (which) {
-                case 0:
-                    if (currentEditOrCreateDialog != null && currentEditOrCreateDialog.isShowing()) {
-                        currentEditOrCreateDialog.hide();
-                    }
+                case 0: // Tomar foto
                     dispatchTakePictureIntent();
                     break;
-                case 1:
-                    if (currentEditOrCreateDialog != null && currentEditOrCreateDialog.isShowing()) {
-                        currentEditOrCreateDialog.hide();
-                    }
+                case 1: // Seleccionar de galería
                     pickImageLauncher.launch("image/*");
                     break;
-                case 2:
+                case 2: // Introducir URL de foto
                     mostrarDialogoIntroducirUrl(nombreLista, fotoUrlActual, isEditingMode);
                     break;
-                case 3:
-                    tempPlaylistPhotoUrl = "";
-                    updatePhotoUrlInDialog("");
+                case 3: // Sin foto
+                    if (isEditingMode) {
+                        mostrarDialogoEditarLista(nombreLista, "");
+                    } else {
+                        mostrarDialogoNuevaListaConFoto(nombreLista, "");
+                    }
                     break;
             }
         });
         builder.setNegativeButton("Cancelar", (dialog, which) -> {
-
+            // Si se cancela aquí, volvemos al diálogo de nombre original o edición
+            dialog.cancel(); // Cerrar este diálogo
+            if (isEditingMode) {
+                // Volver al diálogo de edición con la foto original si es una edición
+                mostrarDialogoEditarLista(nombreLista, fotoUrlActual);
+            } else {
+                // Si es modo creación, al cancelar la selección de foto, volvemos al diálogo de confirmación de nueva lista
+                // para que el usuario pueda crearla sin foto o intentar seleccionar una foto de nuevo.
+                // Limpiar el estado si el usuario cancela completamente la creación
+                tempPlaylistName = null;
+                tempPlaylistPhotoUrl = null;
+                isEditing = false;
+            }
         });
-        builder.show();
+        currentAlertDialog = builder.show(); // Asignar el diálogo actual
     }
 
     private void mostrarDialogoIntroducirUrl(String nombreLista, String fotoUrlActual, boolean isEditingMode) {
+        dismissCurrentDialog(); // Cerrar cualquier diálogo existente
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("URL de la foto");
 
@@ -249,23 +305,27 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         inputFotoUrl.setLayoutParams(lp);
-        inputFotoUrl.setPadding(50, 20, 50, 20);
+        inputFotoUrl.setPadding(50, 20, 50, 20); // Añadir padding
         builder.setView(inputFotoUrl);
 
         builder.setPositiveButton("Guardar", (dialog, which) -> {
             String fotoUrl = inputFotoUrl.getText().toString().trim();
-            tempPlaylistPhotoUrl = fotoUrl;
-            updatePhotoUrlInDialog(tempPlaylistPhotoUrl);
+            if (isEditingMode) {
+                mostrarDialogoEditarLista(nombreLista, fotoUrl);
+            } else {
+                mostrarDialogoNuevaListaConFoto(nombreLista, fotoUrl);
+            }
         });
         builder.setNegativeButton("Cancelar", (dialog, which) -> {
-
+            dialog.cancel(); // Cerrar este diálogo
+            // Volver al diálogo de selección de origen
+            mostrarDialogoSeleccionarFotoOrigen(nombreLista, fotoUrlActual, isEditingMode);
         });
-        builder.show();
+        currentAlertDialog = builder.show(); // Asignar el diálogo actual
     }
 
     private void mostrarDialogoNuevaListaConFoto(String nombreLista, String fotoUrl) {
-        tempPlaylistPhotoUrl = fotoUrl; // Sincroniza la variable temporal
-
+        dismissCurrentDialog(); // Cerrar cualquier diálogo existente
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Confirmar nueva lista");
 
@@ -278,53 +338,39 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
         layout.addView(nombreTv);
 
         TextView fotoTv = new TextView(getContext());
-        fotoTv.setText("Foto URL: ");
+        fotoTv.setText("Foto URL: " + (fotoUrl.isEmpty() ? "Ninguna" : fotoUrl));
         layout.addView(fotoTv);
-
-        inputFotoUrlInDialog = new EditText(getContext());
-        inputFotoUrlInDialog.setHint("URL de la foto");
-        inputFotoUrlInDialog.setText(tempPlaylistPhotoUrl);
-        inputFotoUrlInDialog.setEnabled(false);
-        layout.addView(inputFotoUrlInDialog);
-
-        LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        buttonLp.topMargin = 20;
-        android.widget.Button cambiarFotoBtn = new android.widget.Button(getContext());
-        cambiarFotoBtn.setText("Cambiar Foto");
-        cambiarFotoBtn.setLayoutParams(buttonLp);
-        cambiarFotoBtn.setOnClickListener(v -> {
-            verificarYPedirPermisosParaFoto(false);
-        });
-        layout.addView(cambiarFotoBtn);
 
         builder.setView(layout);
 
         builder.setPositiveButton("Crear", (dialog, which) -> {
-            viewModel.agregarNuevaLista(nombreLista, tempPlaylistPhotoUrl);
+            viewModel.agregarNuevaLista(nombreLista, fotoUrl);
             Toast.makeText(getContext(), "Lista '" + nombreLista + "' creada.", Toast.LENGTH_SHORT).show();
+            // Limpiar variables temporales y asegurar el cierre del diálogo
             tempPlaylistName = null;
             tempPlaylistPhotoUrl = null;
-            currentEditOrCreateDialog = null;
-            inputFotoUrlInDialog = null;
+            isEditing = false;
+            dialog.dismiss(); // Asegura que este diálogo se cierre
         });
-        builder.setNegativeButton("Cancelar", (dialog, which) -> {
-            dialog.cancel();
+        builder.setNegativeButton("Volver", (dialog, which) -> {
+            dialog.cancel(); // Cerrar este diálogo
+            // Si el usuario quiere volver, le damos la opción de cambiar la foto o el nombre
+            mostrarDialogoSeleccionarFotoOrigen(nombreLista, fotoUrl, false);
+        });
+        builder.setNeutralButton("Cancelar", (dialog, which) -> {
+            dialog.cancel(); // Cerrar este diálogo
+            // Limpiar variables temporales si el usuario cancela completamente la creación
             tempPlaylistName = null;
             tempPlaylistPhotoUrl = null;
-            currentEditOrCreateDialog = null;
-            inputFotoUrlInDialog = null;
+            isEditing = false;
         });
 
-        currentEditOrCreateDialog = builder.create();
-        currentEditOrCreateDialog.show();
+        currentAlertDialog = builder.show(); // Asignar el diálogo actual
     }
 
 
     private void mostrarDialogoEditarLista(String nombreActual, String fotoUrl) {
-        tempPlaylistPhotoUrl = fotoUrl;
-
+        dismissCurrentDialog(); // Cerrar cualquier diálogo existente
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Editar lista");
 
@@ -337,12 +383,12 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
         inputNombre.setText(nombreActual);
         layout.addView(inputNombre);
 
-        inputFotoUrlInDialog = new EditText(getContext());
-        inputFotoUrlInDialog.setHint("URL de la foto (opcional)");
-        inputFotoUrlInDialog.setText(tempPlaylistPhotoUrl); // Usa la URI temporal
-        inputFotoUrlInDialog.setEnabled(false); // No editable
-        layout.addView(inputFotoUrlInDialog);
+        // Usamos un TextView para mostrar la URL de la foto, ya que no queremos que sea editable directamente
+        TextView fotoUrlDisplay = new TextView(getContext());
+        fotoUrlDisplay.setText("Foto URL: " + (fotoUrl == null || fotoUrl.isEmpty() ? "Ninguna" : fotoUrl)); // Manejar null
+        layout.addView(fotoUrlDisplay);
 
+        // Botón para cambiar la foto
         LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -351,44 +397,43 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
         cambiarFotoBtn.setText("Cambiar Foto");
         cambiarFotoBtn.setLayoutParams(buttonLp);
         cambiarFotoBtn.setOnClickListener(v -> {
+            // Guardamos el estado actual para volver si se cancela la selección de foto
+            tempPlaylistName = nombreActual;
+            tempPlaylistPhotoUrl = fotoUrl; // La fotoUrl que viene de la selección actual
             isEditing = true;
-            verificarYPedirPermisosParaFoto(true);
+            mostrarDialogoSeleccionarFotoOrigen(nombreActual, fotoUrl, true);
         });
         layout.addView(cambiarFotoBtn);
 
         builder.setView(layout);
 
+        final String finalFotoUrl = fotoUrl; // Creamos una variable final para usar en el listener
+
         builder.setPositiveButton("Guardar", (dialog, which) -> {
             String nuevoNombre = inputNombre.getText().toString().trim();
-            String nuevaFotoUrl = tempPlaylistPhotoUrl;
 
             if (!nuevoNombre.isEmpty()) {
-                viewModel.editarLista(nombreActual, nuevoNombre, nuevaFotoUrl);
+                // Usamos la URL que llegó al diálogo, que es la correcta
+                viewModel.editarLista(nombreActual, nuevoNombre, finalFotoUrl);
                 Toast.makeText(getContext(), "Lista '" + nuevoNombre + "' actualizada.", Toast.LENGTH_SHORT).show();
+                // Limpiar variables temporales y asegurar el cierre del diálogo
+                tempPlaylistName = null;
+                tempPlaylistPhotoUrl = null;
+                isEditing = false;
+                dialog.dismiss(); // Asegura que este diálogo se cierre
             } else {
                 Toast.makeText(getContext(), "El nombre de la lista no puede estar vacío", Toast.LENGTH_SHORT).show();
             }
-            tempPlaylistName = null;
-            tempPlaylistPhotoUrl = null;
-            currentEditOrCreateDialog = null;
-            inputFotoUrlInDialog = null;
         });
         builder.setNegativeButton("Cancelar", (dialog, which) -> {
-            dialog.cancel();
+            dialog.cancel(); // Cerrar este diálogo
+            // Limpiar variables temporales al cancelar la edición
             tempPlaylistName = null;
             tempPlaylistPhotoUrl = null;
-            currentEditOrCreateDialog = null;
-            inputFotoUrlInDialog = null;
+            isEditing = false;
         });
 
-        currentEditOrCreateDialog = builder.create();
-        currentEditOrCreateDialog.show();
-    }
-
-    private void updatePhotoUrlInDialog(String newPhotoUrl) {
-        if (inputFotoUrlInDialog != null) {
-            inputFotoUrlInDialog.setText(newPhotoUrl);
-        }
+        currentAlertDialog = builder.show(); // Asignar el diálogo actual
     }
 
     @Override
@@ -400,44 +445,77 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
 
     @Override
     public void onListaLongClick(String nombreLista) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        isEditing = true;
+        tempPlaylistName = nombreLista;
+
+        // Crear una referencia final al observador para poder eliminarlo después
+        final Observer<Map<String, String>> observer = new Observer<Map<String, String>>() {
+            @Override
+            public void onChanged(Map<String, String> listaInfo) {
+                if (listaInfo != null && listaInfo.containsKey("fotoUrl")) {
+                    tempPlaylistPhotoUrl = listaInfo.get("fotoUrl");
+                } else {
+                    tempPlaylistPhotoUrl = null; // O una URL por defecto si no hay foto
+                }
+                // Una vez que tenemos la info, mostramos el diálogo de opciones.
+                mostrarDialogoOpcionesLista(nombreLista);
+
+                // Eliminar el observador inmediatamente después de que se dispare una vez
+                viewModel.getListaInfo(nombreLista).removeObserver(this);
+            }
+        };
+
+        viewModel.getListaInfo(nombreLista).observe(getViewLifecycleOwner(), observer);
+    }
+
+    private void mostrarDialogoOpcionesLista(String nombreLista) {
+        dismissCurrentDialog(); // Cerrar cualquier diálogo existente antes de mostrar el nuevo
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Opciones de la lista");
         String[] opciones = {"Editar", "Eliminar"};
         builder.setItems(opciones, (dialog, which) -> {
             switch (which) {
-                case 0:
-                    viewModel.getListaInfo(nombreLista).observe(getViewLifecycleOwner(), listaInfo -> {
-                        if (listaInfo != null) {
-                            String fotoUrl = listaInfo.get("fotoUrl");
-                            tempPlaylistName = nombreLista;
-                            tempPlaylistPhotoUrl = fotoUrl;
-                            isEditing = true;
-                            mostrarDialogoEditarLista(nombreLista, fotoUrl);
-                        }
-                    });
+                case 0: // Editar
+                    // Usar las variables temporales establecidas en onListaLongClick
+                    mostrarDialogoEditarLista(tempPlaylistName, tempPlaylistPhotoUrl);
                     break;
-                case 1:
+                case 1: // Eliminar
                     mostrarDialogoConfirmarEliminar(nombreLista);
                     break;
             }
         });
-        builder.show();
+        builder.setNegativeButton("Cancelar", (dialog, which) -> {
+            dialog.cancel(); // Cerrar este diálogo
+            // Limpiar el estado al cancelar las opciones de edición
+            tempPlaylistName = null;
+            tempPlaylistPhotoUrl = null;
+            isEditing = false;
+        });
+        currentAlertDialog = builder.show(); // Asignar el diálogo actual
     }
 
     private void mostrarDialogoConfirmarEliminar(String nombreLista) {
-        new AlertDialog.Builder(getContext())
+        dismissCurrentDialog(); // Cerrar cualquier diálogo existente
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext())
                 .setTitle("Eliminar lista")
                 .setMessage("¿Estás seguro de que quieres eliminar la lista '" + nombreLista + "'?")
                 .setPositiveButton("Eliminar", (dialog, which) -> {
                     viewModel.eliminarLista(nombreLista);
                     Toast.makeText(getContext(), "Lista '" + nombreLista + "' eliminada.", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss(); // Asegura que este diálogo se cierre
                 })
-                .setNegativeButton("Cancelar", (dialog, which) -> dialog.cancel())
-                .show();
+                .setNegativeButton("Cancelar", (dialog, which) -> {
+                    dialog.cancel(); // Cerrar este diálogo
+                });
+        currentAlertDialog = builder.show(); // Asignar el diálogo actual
     }
 
     private void verificarYPedirPermisosParaFoto(boolean isEditingMode) {
-        isEditing = isEditingMode;
+        // No es necesario llamar a dismissCurrentDialog() aquí,
+        // ya que este método prepara para lanzar una actividad (permisos/cámara),
+        // y el diálogo actual ya se habrá cerrado en la llamada anterior
+        // (ej. desde mostrarDialogoPedirNombreLista o mostrarDialogoSeleccionarFotoOrigen)
+        isEditing = isEditingMode; // Establecer el modo antes de solicitar permisos
 
         List<String> permissionsToRequest = new ArrayList<>();
         permissionsToRequest.add(Manifest.permission.CAMERA);
@@ -457,27 +535,27 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
         }
 
         if (allPermissionsGranted) {
+            // Permisos ya concedidos, proceder directamente al diálogo de selección de origen
             if (isEditingMode) {
                 mostrarDialogoSeleccionarFotoOrigen(tempPlaylistName, tempPlaylistPhotoUrl, true);
             } else {
-                mostrarDialogoSeleccionarFotoOrigen(tempPlaylistName, tempPlaylistPhotoUrl, false);
+                mostrarDialogoSeleccionarFotoOrigen(tempPlaylistName, "", false);
             }
         } else {
+            // Solicitar permisos
             requestPermissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
         }
     }
 
     private File createImageFile() throws IOException {
+        // Crea un nombre de archivo de imagen único
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String imageFileName = "JPEG_" + timeStamp + "_";
         File storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        if (storageDir == null) {
-            throw new IOException("No se pudo acceder al directorio de almacenamiento externo de la aplicación.");
-        }
         File image = File.createTempFile(
-                imageFileName,
-                ".jpg",
-                storageDir
+                imageFileName,  /* prefijo */
+                ".jpg",         /* sufijo */
+                storageDir      /* directorio */
         );
         currentPhotoPath = image.getAbsolutePath();
         return image;
@@ -485,6 +563,7 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
 
     private void dispatchTakePictureIntent() {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        // Asegúrate de que haya una actividad de cámara para manejar el intent
         if (takePictureIntent.resolveActivity(requireContext().getPackageManager()) != null) {
             File photoFile = null;
             try {
@@ -507,7 +586,7 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
 
     private String saveImageToInternalStorageAndGetUri(Uri sourceUri) {
         try {
-            File destinationFile = createImageFile();
+            File destinationFile = createImageFile(); // Reutilizamos el método para crear un archivo temporal
             try (InputStream inputStream = requireContext().getContentResolver().openInputStream(sourceUri);
                  FileOutputStream outputStream = new FileOutputStream(destinationFile)) {
                 if (inputStream != null) {
@@ -516,6 +595,7 @@ public class ListasFragment extends Fragment implements ListaReproduccionAdapter
                     while ((length = inputStream.read(buffer)) > 0) {
                         outputStream.write(buffer, 0, length);
                     }
+                    // Retornamos la URI del archivo temporal
                     return Uri.fromFile(destinationFile).toString();
                 }
             }

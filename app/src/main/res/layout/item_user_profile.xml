@@ -33,4 +33,11 @@
         android:text="correo@ejemplo.com" />
 
 </LinearLayout>
+    <ImageView
+        android:id="@+id/ivDeleteFriend"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:src="@android:drawable/ic_delete"
+        android:contentDescription="Eliminar amigo" />
 </LinearLayout>
