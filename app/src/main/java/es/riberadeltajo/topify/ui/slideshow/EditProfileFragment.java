@@ -34,10 +34,11 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.UnsupportedEncodingException; // Importar para manejo de errores de codificación
 import java.util.HashMap;
 import java.util.Map;
 
-import es.riberadeltajo.topify.LocationActivity; // Asegúrate de que esta clase exista en este paquete
+import es.riberadeltajo.topify.LocationActivity;
 import es.riberadeltajo.topify.R;
 
 public class EditProfileFragment extends Fragment {
@@ -64,6 +65,23 @@ public class EditProfileFragment extends Fragment {
         }
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+    }
+
+    // Método para decodificar una cadena Base64
+    private String decodeBase64(String encodedString) {
+        if (encodedString == null || encodedString.isEmpty()) {
+            return "";
+        }
+        try {
+            byte[] decodedBytes = Base64.decode(encodedString, Base64.DEFAULT);
+            return new String(decodedBytes, "UTF-8");
+        } catch (IllegalArgumentException e) {
+            Log.e("Base64Decoder", "Error decodificando Base64: " + e.getMessage() + " para la cadena: " + encodedString);
+            return encodedString; // Devuelve la cadena original si hay un error de formato Base64
+        } catch (UnsupportedEncodingException e) {
+            Log.e("Base64Decoder", "Error de codificación de caracteres: " + e.getMessage());
+            return encodedString; // Devuelve la cadena original si hay un error de codificación
+        }
     }
 
     @Nullable
@@ -139,10 +157,10 @@ public class EditProfileFragment extends Fragment {
             editTextPhone.setText(savedPhone);
         }
 
-        String savedAddress = sharedPreferences.getString("user_address", "Ubicación Actual");
-        editTextAddress.setText(savedAddress);
+        final String[] savedAddress = {sharedPreferences.getString("user_address", "Ubicación Actual")};
+        editTextAddress.setText(savedAddress[0]);
 
-        // Cargar nombre desde Firebase
+        // Cargar nombre, teléfono y ubicación desde Firebase
         FirebaseUser currentUser = auth.getCurrentUser();
         if (currentUser != null) {
             String uid = currentUser.getUid();
@@ -150,55 +168,97 @@ public class EditProfileFragment extends Fragment {
                     .get()
                     .addOnSuccessListener(documentSnapshot -> {
                         if (documentSnapshot.exists()) {
-                            String firebaseName = documentSnapshot.getString("nombre");
-                            if (firebaseName != null) {
-                                editTextName.setText(firebaseName);
+                            // Obtener valores codificados de Firebase
+                            String firebaseNameEncoded = documentSnapshot.getString("nombre");
+                            String firebasePhoneEncoded = documentSnapshot.getString("telefono"); // Asumiendo que 'telefono' está en Firestore
+                            String firebaseAddressEncoded = documentSnapshot.getString("ubicacion"); // Asumiendo que 'ubicacion' está en Firestore
+
+                            // Decodificar los valores
+                            String firebaseNameDecoded = decodeBase64(firebaseNameEncoded);
+                            String firebasePhoneDecoded = decodeBase64(firebasePhoneEncoded);
+                            String firebaseAddressDecoded = decodeBase64(firebaseAddressEncoded);
+
+
+                            // Establecer los valores decodificados en los EditText
+                            if (firebaseNameDecoded != null && !firebaseNameDecoded.isEmpty()) {
+                                editTextName.setText(firebaseNameDecoded);
                             } else {
-                                Log.d(TAG, "El campo 'nombre' no existe en el documento del usuario en Firestore.");
+                                Log.d(TAG, "El campo 'nombre' decodificado es nulo o vacío en Firestore.");
                                 String savedName = sharedPreferences.getString("user_name", "Nombre de Usuario Actual");
                                 editTextName.setText(savedName);
                             }
+
+                            if (firebasePhoneDecoded != null && !firebasePhoneDecoded.isEmpty()) {
+                                // Intenta establecer el número decodificado en el CountryCodePicker
+                                try {
+                                    countryCodePicker.setFullNumber(firebasePhoneDecoded);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Error al establecer el número de teléfono decodificado en CountryCodePicker: " + e.getMessage());
+                                    editTextPhone.setText(firebasePhoneDecoded); // Si falla, solo establece el texto
+                                }
+                            }
+
+                            if (firebaseAddressDecoded != null && !firebaseAddressDecoded.isEmpty()) {
+                                editTextAddress.setText(firebaseAddressDecoded);
+                            }
+
                         } else {
                             Log.d(TAG, "No se encontró el documento para el UID: " + uid + " en Firestore.");
                             String savedName = sharedPreferences.getString("user_name", "Nombre de Usuario Actual");
                             editTextName.setText(savedName);
+                            savedAddress[0] = sharedPreferences.getString("user_address", "Ubicación Actual");
+                            editTextAddress.setText(savedAddress[0]);
+                            // También para el teléfono si no se encuentra en Firebase
+                            String savedPhone = sharedPreferences.getString("user_phone", "");
+                            editTextPhone.setText(savedPhone);
                         }
                     })
                     .addOnFailureListener(e -> {
-                        Log.w(TAG, "Error al cargar el nombre de Firebase Firestore", e);
+                        Log.w(TAG, "Error al cargar datos de Firebase Firestore", e);
                         String savedName = sharedPreferences.getString("user_name", "Nombre de Usuario Actual");
                         editTextName.setText(savedName);
-                        Toast.makeText(getContext(), "Error al cargar el nombre de Firebase.", Toast.LENGTH_SHORT).show();
+                        savedAddress[0] = sharedPreferences.getString("user_address", "Ubicación Actual");
+                        editTextAddress.setText(savedAddress[0]);
+                        String savedPhone = sharedPreferences.getString("user_phone", "");
+                        editTextPhone.setText(savedPhone);
+                        Toast.makeText(getContext(), "Error al cargar datos de Firebase.", Toast.LENGTH_SHORT).show();
                     });
         } else {
-            Log.d(TAG, "Usuario no autenticado, cargando nombre de SharedPreferences.");
+            Log.d(TAG, "Usuario no autenticado, cargando datos de SharedPreferences.");
             String savedName = sharedPreferences.getString("user_name", "Nombre de Usuario Actual");
             editTextName.setText(savedName);
+            String savedPhone = sharedPreferences.getString("user_phone", "");
+            editTextPhone.setText(savedPhone);
+            savedAddress[0] = sharedPreferences.getString("user_address", "Ubicación Actual");
+            editTextAddress.setText(savedAddress[0]);
         }
     }
 
+
     private void saveProfileChanges() {
         String newUserName = editTextName.getText().toString().trim();
-        String newPhoneNumber = editTextPhone.getText().toString().trim(); // Asumiendo que tienes un EditText para el teléfono
-        String newLocation = editTextAddress.getText().toString().trim(); // Asumiendo que tienes un EditText para la ubicación
+        // Obtener el número de teléfono completo del CountryCodePicker
+        String newPhoneNumber = countryCodePicker.getFullNumberWithPlus();
+        String newLocation = editTextAddress.getText().toString().trim();
 
         FirebaseUser user = auth.getCurrentUser();
         if (user != null) {
-            // Codificar los datos a Base64
+            // Codificar los datos a Base64 antes de guardar
             String encodedUserName = Base64.encodeToString(newUserName.getBytes(), Base64.DEFAULT);
             String encodedPhoneNumber = Base64.encodeToString(newPhoneNumber.getBytes(), Base64.DEFAULT);
             String encodedLocation = Base64.encodeToString(newLocation.getBytes(), Base64.DEFAULT);
 
             Map<String, Object> updates = new HashMap<>();
             updates.put("nombre", encodedUserName);
-            updates.put("telefono", encodedPhoneNumber); // Asegúrate de que tu modelo de usuario en Firestore tenga un campo 'telefono'
-            updates.put("ubicacion", encodedLocation);   // Asegúrate de que tu modelo de usuario en Firestore tenga un campo 'ubicacion'
+            updates.put("telefono", encodedPhoneNumber);
+            updates.put("ubicacion", encodedLocation);
 
             db.collection("usuarios").document(user.getUid())
                     .update(updates)
                     .addOnSuccessListener(aVoid -> {
                         Toast.makeText(getContext(), "Perfil actualizado con éxito.", Toast.LENGTH_SHORT).show();
-                        // Puedes navegar de vuelta al PerfilFragment aquí
+                        // Guardar también en SharedPreferences por si acaso para la siguiente carga rápida
+                        saveDataToSharedPreferences(newUserName, newPhoneNumber, newLocation, countryCodePicker.getFullNumberWithPlus());
                         Navigation.findNavController(requireView()).popBackStack(); // Vuelve al fragmento anterior
                     })
                     .addOnFailureListener(e -> {

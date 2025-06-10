@@ -86,6 +86,7 @@ public class SongDetailActivity extends AppCompatActivity {
     private ListenerRegistration commentsListenerRegistration;
 
     private boolean isDarkMode = false;
+    private long songDeezerId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -134,13 +135,13 @@ public class SongDetailActivity extends AppCompatActivity {
             String coverUrl = intent.getStringExtra("coverUrl");
             int duration = intent.getIntExtra("duration", 0);
             String previewUrl = intent.getStringExtra("previewUrl");
-            long deezerId = intent.getLongExtra("deezerId", 0);
+            songDeezerId = intent.getLongExtra("deezerId", 0);
 
             currentSong = new DeezerTrackResponse.Track();
             currentSong.title = title;
             currentSong.duration = duration;
             currentSong.preview = previewUrl;
-            currentSong.deezer_id = deezerId;
+            currentSong.deezer_id = songDeezerId;
 
             currentSong.artist = new DeezerTrackResponse.Track.Artist();
             currentSong.artist.name = artistName;
@@ -148,7 +149,6 @@ public class SongDetailActivity extends AppCompatActivity {
             currentSong.album = new DeezerTrackResponse.Track.Album();
             currentSong.album.cover_big = coverUrl;
 
-            // LOG DEPURACIÓN: ID de la canción recibido
             Log.d("SongDetailDebug", "onCreate: Song Deezer ID recibido: " + currentSong.deezer_id);
 
 
@@ -269,7 +269,7 @@ public class SongDetailActivity extends AppCompatActivity {
         super.onStop();
         if (commentsListenerRegistration != null) {
             commentsListenerRegistration.remove();
-            Log.d("SongDetailDebug", "onStop: Listener de comentarios desregistrado.");
+            commentsListenerRegistration = null;
         }
         stopPreview();
     }
@@ -405,9 +405,7 @@ public class SongDetailActivity extends AppCompatActivity {
             }
         }
 
-        long songDeezerId = currentSong.deezer_id;
 
-        // LOG DEPURACIÓN: ID de la canción que se va a guardar
         Log.d("SongDetailDebug", "postComment: Intentando guardar comentario para Song Deezer ID: " + songDeezerId);
         Log.d("SongDetailDebug", "postComment: Comentario: \"" + commentText + "\" por: " + userName + " (UserID: " + userId + ")");
 
@@ -428,61 +426,59 @@ public class SongDetailActivity extends AppCompatActivity {
     }
 
     private void loadComments(long songDeezerId) {
-        Log.d("SongDetailDebug", "loadComments: Configurando listener para Song Deezer ID: " + songDeezerId);
+        Log.d("SongDetailDebug", "loadComments: Cargando comentarios para la canción ID: " + songDeezerId);
 
-        // Desregistrar el listener anterior si existe para evitar duplicados
         if (commentsListenerRegistration != null) {
             commentsListenerRegistration.remove();
-            Log.d("SongDetailDebug", "loadComments: Listener de comentarios existente desregistrado antes de cargar nuevos.");
+            Log.d("SongDetailDebug", "loadComments: Listener anterior desregistrado.");
         }
 
-        CollectionReference commentsRef = db.collection("comments");
+        if (commentAdapter != null) {
+            commentAdapter.setComments(new ArrayList<>());
+            Log.d("SongDetailDebug", "loadComments: Adaptador de comentarios limpiado.");
+        }
 
-        Query query = commentsRef
+        commentsListenerRegistration = db.collection("comments")
                 .whereEqualTo("songDeezerId", songDeezerId)
-                .orderBy("timestamp", Query.Direction.ASCENDING);
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener(new EventListener<QuerySnapshot>() {
+                    @Override
+                    public void onEvent(@Nullable QuerySnapshot snapshots, @Nullable FirebaseFirestoreException e) {
+                        if (e != null) {
+                            Log.w("SongDetailDebug", "loadComments: Error en el listener de comentarios.", e);
+                            return;
+                        }
 
-        commentsListenerRegistration = query.addSnapshotListener(new EventListener<QuerySnapshot>() {
-            @Override
-            public void onEvent(@Nullable QuerySnapshot snapshots,
-                                @Nullable FirebaseFirestoreException e) {
+                        List<Comment> updatedComments = new ArrayList<>();
+                        if (snapshots != null) {
+                            Log.d("SongDetailDebug", "loadComments: Documentos en el snapshot: " + snapshots.size());
 
-                if (e != null) {
-                    Log.w("SongDetailDebug", "loadComments: Escucha de comentarios falló.", e);
-                    Toast.makeText(SongDetailActivity.this, "Error al cargar comentarios.", Toast.LENGTH_SHORT).show();
-                    return;
-                }
+                            for (QueryDocumentSnapshot doc : snapshots) {
+                                try {
+                                    Comment comment = doc.toObject(Comment.class);
+                                    comment.setId(doc.getId());
+                                    updatedComments.add(comment);
+                                    Log.d("SongDetailDebug", "loadComments: Comentario cargado: " + comment.getText() + " | ID: " + comment.getSongDeezerId());
+                                } catch (Exception ex) {
+                                    Log.e("SongDetailDebug", "loadComments: Error al convertir documento a objeto Comment: " + doc.getId(), ex);
+                                }
+                            }
 
-                if (snapshots != null) {
-                    List<Comment> updatedComments = new ArrayList<>();
-                    Log.d("SongDetailDebug", "loadComments: Listener activado. Cambios detectados: " + snapshots.getDocumentChanges().size());
-                    Log.d("SongDetailDebug", "loadComments: Documentos en el snapshot: " + snapshots.size());
+                            if (updatedComments.isEmpty()) {
+                                Log.d("SongDetailDebug", "loadComments: No hay comentarios para esta canción.");
+                            } else {
+                                Log.d("SongDetailDebug", "loadComments: Comentarios actualizados. Total: " + updatedComments.size());
+                            }
 
-                    for (QueryDocumentSnapshot doc : snapshots) {
-                        try {
-                            Comment comment = doc.toObject(Comment.class);
-                            comment.setId(doc.getId());
-                            updatedComments.add(comment);
-                            Log.d("SongDetailDebug", "loadComments: Comentario cargado: " + comment.getText() + " | ID: " + comment.getSongDeezerId());
-                        } catch (Exception ex) {
-                            Log.e("SongDetailDebug", "loadComments: Error al convertir documento a objeto Comment: " + doc.getId(), ex);
+                            commentAdapter.setComments(updatedComments);
+
+                            if (updatedComments.size() > 0) {
+                                recyclerViewComments.scrollToPosition(updatedComments.size() - 1);
+                            }
+                        } else {
+                            Log.d("SongDetailDebug", "loadComments: Snapshots es null.");
                         }
                     }
-
-                    if (updatedComments.isEmpty()) {
-                        Log.d("SongDetailDebug", "loadComments: No hay comentarios para esta canción.");
-                    } else {
-                        Log.d("SongDetailDebug", "loadComments: Comentarios actualizados. Total: " + updatedComments.size());
-                    }
-
-                    commentAdapter.setComments(updatedComments);
-                    if (commentsList.size() > 0) {
-                        recyclerViewComments.scrollToPosition(commentsList.size() - 1);
-                    }
-                } else {
-                    Log.d("SongDetailDebug", "loadComments: Snapshots es null.");
-                }
-            }
-        });
+                });
     }
 }

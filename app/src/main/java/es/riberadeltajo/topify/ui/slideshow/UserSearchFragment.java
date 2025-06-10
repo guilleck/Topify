@@ -20,6 +20,8 @@ import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -33,6 +35,7 @@ import es.riberadeltajo.topify.models.User;
 public class UserSearchFragment extends Fragment {
     private RecyclerView rvUsers;
     private FirebaseFirestore db;
+    private FirebaseAuth auth;
     private List<User> userList = new ArrayList<>();
     private UserAdapter adapter;
 
@@ -48,9 +51,8 @@ public class UserSearchFragment extends Fragment {
         btnSearch = view.findViewById(R.id.btnSearch);
 
         db = FirebaseFirestore.getInstance();
+        auth = FirebaseAuth.getInstance();
 
-        // Si UserAdapter necesita el nombre decodificado, asegúrate de que el constructor o un método lo maneje
-        // Por ahora, asumiremos que el objeto User contendrá el nombre ya decodificado
         adapter = new UserAdapter(userList, user -> openUserProfile(user.getId()));
         rvUsers.setLayoutManager(new LinearLayoutManager(getContext()));
         rvUsers.setAdapter(adapter);
@@ -96,9 +98,7 @@ public class UserSearchFragment extends Fragment {
 
                         String emailDecodificado = decodeBase64(email);
 
-                        // Aplicar filtro al nombre decodificado
                         if (filterName == null || filterName.isEmpty() || (nombreDecodificado != null && nombreDecodificado.toLowerCase().contains(filterName.toLowerCase()))) {
-                            // Crear el objeto User con el nombre (y email) decodificado
                             userList.add(new User(id, nombreDecodificado, emailDecodificado, foto)); // Usa 'email' o 'emailDecodificado'
                         }
                     }
@@ -114,14 +114,21 @@ public class UserSearchFragment extends Fragment {
     }
 
     private void openUserProfile(String userId) {
-        // Obtiene el NavController desde la vista del fragmento
         NavController navController = Navigation.findNavController(requireView());
 
-        // Crea un Bundle para pasar argumentos (en este caso, el ID del usuario)
-        Bundle bundle = new Bundle();
-        bundle.putString("userId", userId); // Asegúrate de usar la misma clave definida en el XML
+        FirebaseUser currentUser = auth.getCurrentUser();
+        String currentUserId = null;
+        if (currentUser != null) {
+            currentUserId = currentUser.getUid();
+        }
 
-        // Navega a UserProfileFragment usando la acción definida en mobile_navigation.xml
-        navController.navigate(R.id.action_searchUsersFragment_to_userProfileFragment, bundle);
+        if (currentUserId != null && currentUserId.equals(userId)) {
+            navController.navigate(R.id.nav_perfil);
+        } else {
+            Bundle bundle = new Bundle();
+            bundle.putString("userId", userId);
+
+            navController.navigate(R.id.action_searchUsersFragment_to_userProfileFragment, bundle);
+        }
     }
 }

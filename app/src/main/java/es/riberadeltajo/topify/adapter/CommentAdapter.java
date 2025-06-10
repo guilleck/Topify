@@ -76,7 +76,7 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
             }
 
             if (isDarkMode) {
-                rootView.setBackgroundColor(Color.parseColor("#333333")); // Un poco más oscuro para el item
+                rootView.setBackgroundColor(Color.parseColor("#333333"));
                 textViewCommentUser.setTextColor(Color.WHITE);
                 textViewCommentText.setTextColor(Color.LTGRAY);
                 textViewCommentTimestamp.setTextColor(Color.GRAY);
